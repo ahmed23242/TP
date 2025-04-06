@@ -5,7 +5,7 @@ import '../models/incident.dart';
 
 class IncidentRepository {
   final ApiClient _apiClient = ApiClient();
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final _db = DatabaseHelper.instance;
   final RxBool isSyncing = false.obs;
 
   Future<List<Incident>> getIncidents() async {
@@ -14,7 +14,7 @@ class IncidentRepository {
       return incidents.map((data) => Incident.fromMap(data)).toList();
     } catch (e) {
       // If API fails, return local incidents
-      final localIncidents = await _dbHelper.getUserIncidents(1); // TODO: Get actual user ID
+      final localIncidents = await _db.getIncidentsByUserId(1); // TODO: Get actual user ID
       return localIncidents.map((data) => Incident.fromMap(data)).toList();
     }
   }
@@ -26,7 +26,7 @@ class IncidentRepository {
       return true;
     } catch (e) {
       // If offline, save locally
-      await _dbHelper.insertIncident(incident.toMap());
+      await _db.insertIncident(incident.toMap());
       return true;
     }
   }
@@ -36,7 +36,7 @@ class IncidentRepository {
     
     try {
       isSyncing.value = true;
-      final unsyncedIncidents = await _dbHelper.getUnsyncedIncidents();
+      final unsyncedIncidents = await _db.getUnsyncedIncidents();
       
       if (unsyncedIncidents.isEmpty) return;
       
@@ -44,7 +44,7 @@ class IncidentRepository {
       
       // Mark all synced incidents
       for (var incident in unsyncedIncidents) {
-        await _dbHelper.markIncidentAsSynced(incident['id']);
+        await _db.updateIncidentSyncStatus(incident['id'], 'synced');
       }
     } finally {
       isSyncing.value = false;

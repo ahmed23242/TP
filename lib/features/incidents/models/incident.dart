@@ -1,5 +1,5 @@
 class Incident {
-  final int? id;
+  final int id;
   final String title;
   final String description;
   final String? photoPath;
@@ -14,7 +14,7 @@ class Incident {
   final int userId;
 
   Incident({
-    this.id,
+    required this.id,
     required this.title,
     required this.description,
     this.photoPath,
@@ -25,7 +25,7 @@ class Incident {
     required this.createdAt,
     this.status = 'pending',
     this.incidentType = 'general',
-    this.syncStatus = 'pending',
+    required this.syncStatus,
     required this.userId,
   });
 
@@ -35,7 +35,6 @@ class Incident {
       'title': title,
       'description': description,
       'photo_path': photoPath,
-      'photo_url': photoUrl,
       'voice_note_path': voiceNotePath,
       'latitude': latitude,
       'longitude': longitude,
@@ -49,19 +48,19 @@ class Incident {
 
   factory Incident.fromMap(Map<String, dynamic> map) {
     return Incident(
-      id: map['id'],
-      title: map['title'],
-      description: map['description'],
-      photoPath: map['photo_path'],
-      photoUrl: map['photo_url'],
-      voiceNotePath: map['voice_note_path'],
-      latitude: map['latitude'],
-      longitude: map['longitude'],
-      createdAt: DateTime.parse(map['created_at']),
+      id: map['id'] as int,
+      title: map['title'] as String,
+      description: map['description'] as String,
+      photoPath: map['photo_path'] as String?,
+      photoUrl: map['photo_url'] as String?,
+      voiceNotePath: map['voice_note_path'] as String?,
+      latitude: map['latitude'] as double,
+      longitude: map['longitude'] as double,
+      createdAt: DateTime.parse(map['created_at'] as String),
       status: map['status'] ?? 'pending',
       incidentType: map['incident_type'] ?? 'general',
-      syncStatus: map['sync_status'] ?? 'pending',
-      userId: map['user_id'],
+      syncStatus: map['sync_status'] as String,
+      userId: map['user_id'] as int,
     );
   }
 }

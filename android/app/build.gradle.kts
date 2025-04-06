@@ -8,7 +8,6 @@ plugins {
 android {
     namespace = "com.example.accidentsapp"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "29.0.13113456"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -37,6 +36,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }
 
 flutter {

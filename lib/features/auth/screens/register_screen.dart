@@ -120,12 +120,11 @@ class RegisterScreen extends StatelessWidget {
                       ? null
                       : () {
                           if (_formKey.currentState!.validate()) {
-                            authController.register({
-                              'username': _usernameController.text,
-                              'email': _emailController.text,
-                              'password': _passwordController.text,
-                              'phone_number': _phoneController.text,
-                            });
+                            authController.register(
+                              _emailController.text,
+                              _passwordController.text,
+                              _phoneController.text,
+                            );
                           }
                         },
                   style: ElevatedButton.styleFrom(

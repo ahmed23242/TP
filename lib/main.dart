@@ -2,14 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'features/auth/services/auth_service.dart';
 import 'features/incidents/services/incident_service.dart';
+import 'features/incidents/controllers/incident_controller.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/incidents/screens/home_screen.dart';
 import 'features/incidents/screens/map_screen.dart';
 import 'features/incidents/screens/create_incident_screen.dart';
 import 'features/incidents/screens/incident_details_screen.dart';
+import 'features/auth/controllers/auth_controller.dart';
+import 'features/incidents/services/location_service.dart';
+import 'features/incidents/services/audio_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialisation des services
+  final authService = AuthService();
+  Get.put(authService, permanent: true);
+  
+  // Enregistrer l'AuthController comme permanent pour qu'il ne soit pas supprimé de la mémoire
+  final authController = AuthController();
+  Get.put(authController, permanent: true);
+  
+  // Autres services
+  Get.put(IncidentService());
+  Get.put(LocationService());
+  Get.put(AudioService());
+  
   runApp(const MyApp());
 }
 
@@ -38,6 +57,8 @@ class MyApp extends StatelessWidget {
       initialBinding: BindingsBuilder(() {
         Get.put(AuthService());
         Get.put(IncidentService());
+        Get.lazyPut(() => IncidentController());
+        Get.put(AuthController(), permanent: true);
       }),
       initialRoute: '/login',
       getPages: [
@@ -45,7 +66,13 @@ class MyApp extends StatelessWidget {
         GetPage(name: '/register', page: () => RegisterScreen()),
         GetPage(name: '/home', page: () => const HomeScreen()),
         GetPage(name: '/map', page: () => const MapScreen()),
-        GetPage(name: '/incident/create', page: () => const CreateIncidentScreen()),
+        GetPage(
+          name: '/incident/create', 
+          page: () => const CreateIncidentScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
         GetPage(name: '/incident/details', page: () => IncidentDetailsScreen()),
       ],
     );

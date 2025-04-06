@@ -7,9 +7,10 @@ import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/database/database_helper.dart';
 import '../models/incident.dart';
+import 'dart:developer' as developer;
 
 class IncidentService extends GetxController {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
+  final _db = DatabaseHelper.instance;
   final _imagePicker = ImagePicker();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   
@@ -20,11 +21,19 @@ class IncidentService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initRecorder();
+    // Initialisation différée pour éviter de bloquer le thread principal
+    Future.delayed(Duration.zero, () async {
+      await _initRecorder();
+    });
   }
 
   Future<void> _initRecorder() async {
-    await _recorder.openRecorder();
+    try {
+      await _recorder.openRecorder();
+      developer.log('Audio recorder initialized successfully');
+    } catch (e) {
+      developer.log('Error initializing audio recorder', error: e);
+    }
   }
   
   // Location handling
@@ -99,26 +108,48 @@ class IncidentService extends GetxController {
   // Incident CRUD operations
   Future<bool> createIncident(Incident incident) async {
     try {
-      final int id = await _dbHelper.insertIncident(incident.toMap());
-      if (id != -1) {
-        incidents.add(incident);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Error creating incident: $e');
+      await _db.insertIncident(incident.toMap());
+      developer.log('Incident created: ${incident.id}');
+      incidents.add(incident);
+      return true;
+    } catch (e, stackTrace) {
+      developer.log('Error creating incident', error: e, stackTrace: stackTrace);
+      rethrow;
       return false;
     }
   }
 
   Future<List<Incident>> getUserIncidents(int userId) async {
     try {
-      final List<Map<String, dynamic>> maps = await _dbHelper.getUserIncidents(userId);
-      incidents.value = maps.map((map) => Incident.fromMap(map)).toList();
-      return incidents;
-    } catch (e) {
-      print('Error getting user incidents: $e');
+      final incidents = await _db.getIncidentsByUserId(userId);
+      this.incidents.value = incidents.map((map) => Incident.fromMap(map)).toList();
+      return this.incidents;
+    } catch (e, stackTrace) {
+      developer.log('Error getting user incidents', error: e, stackTrace: stackTrace);
+      rethrow;
       return [];
+    }
+  }
+
+  Future<List<Incident>> getUnsyncedIncidents() async {
+    try {
+      final incidents = await _db.getUnsyncedIncidents();
+      return incidents.map((map) => Incident.fromMap(map)).toList();
+    } catch (e, stackTrace) {
+      developer.log('Error getting unsynced incidents', error: e, stackTrace: stackTrace);
+      rethrow;
+      return [];
+    }
+  }
+
+  Future<void> syncIncident(Incident incident) async {
+    try {
+      // TODO: Implement API call to sync with server
+      await _db.updateIncidentSyncStatus(incident.id, 'synced');
+      developer.log('Incident synced: ${incident.id}');
+    } catch (e, stackTrace) {
+      developer.log('Error syncing incident', error: e, stackTrace: stackTrace);
+      rethrow;
     }
   }
 
@@ -126,12 +157,12 @@ class IncidentService extends GetxController {
   Future<void> syncPendingIncidents() async {
     try {
       final List<Map<String, dynamic>> unsyncedIncidents = 
-          await _dbHelper.getUnsyncedIncidents();
+          await _db.getUnsyncedIncidents();
           
       for (var incident in unsyncedIncidents) {
         // TODO: Implement API call to sync incident with backend
         // On successful sync:
-        await _dbHelper.markIncidentAsSynced(incident['id']);
+        await _db.updateIncidentSyncStatus(incident['id'], 'synced');
       }
     } catch (e) {
       print('Error syncing incidents: $e');
