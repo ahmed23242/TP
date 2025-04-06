@@ -9,9 +9,11 @@ import 'features/incidents/screens/home_screen.dart';
 import 'features/incidents/screens/map_screen.dart';
 import 'features/incidents/screens/create_incident_screen.dart';
 import 'features/incidents/screens/incident_details_screen.dart';
+import 'features/incidents/screens/incident_history_screen.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/incidents/services/location_service.dart';
 import 'features/incidents/services/audio_service.dart';
+import 'core/network/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,9 +27,10 @@ void main() async {
   Get.put(authController, permanent: true);
   
   // Autres services
-  Get.put(IncidentService());
-  Get.put(LocationService());
+  Get.put(IncidentService(), permanent: true);
+  Get.put(LocationService(), permanent: true);
   Get.put(AudioService());
+  Get.put(ConnectivityService(), permanent: true);
   
   runApp(const MyApp());
 }
@@ -57,6 +60,7 @@ class MyApp extends StatelessWidget {
       initialBinding: BindingsBuilder(() {
         Get.put(AuthService());
         Get.put(IncidentService());
+        Get.put(ConnectivityService());
         Get.lazyPut(() => IncidentController());
         Get.put(AuthController(), permanent: true);
       }),
@@ -64,8 +68,20 @@ class MyApp extends StatelessWidget {
       getPages: [
         GetPage(name: '/login', page: () => LoginScreen()),
         GetPage(name: '/register', page: () => RegisterScreen()),
-        GetPage(name: '/home', page: () => const HomeScreen()),
-        GetPage(name: '/map', page: () => const MapScreen()),
+        GetPage(
+          name: '/home', 
+          page: () => const HomeScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
+        GetPage(
+          name: '/map', 
+          page: () => const MapScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
         GetPage(
           name: '/incident/create', 
           page: () => const CreateIncidentScreen(),
@@ -73,7 +89,20 @@ class MyApp extends StatelessWidget {
             Get.put(IncidentController());
           }),
         ),
-        GetPage(name: '/incident/details', page: () => IncidentDetailsScreen()),
+        GetPage(
+          name: '/incident/details', 
+          page: () => IncidentDetailsScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
+        GetPage(
+          name: '/incident/history', 
+          page: () => const IncidentHistoryScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
       ],
     );
   }
@@ -84,7 +113,7 @@ class AuthenticationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final AuthService authService = Get.find<AuthService>();
+    final AuthController authController = Get.find<AuthController>();
 
     return Scaffold(
       body: SafeArea(
@@ -100,62 +129,17 @@ class AuthenticationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 48),
               ElevatedButton(
-                onPressed: () async {
-                  bool authenticated = await authService.authenticateWithBiometrics();
-                  if (authenticated) {
-                    Get.off(() => const HomeScreen());
-                  }
-                },
+                onPressed: () => authController.loginWithBiometrics(),
                 child: const Text('Login with Biometrics'),
               ),
               const SizedBox(height: 16),
-              // TODO: Add email/password login form
+              ElevatedButton(
+                onPressed: () => Get.toNamed('/login'),
+                child: const Text('Login with Email'),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final IncidentService incidentService = Get.find<IncidentService>();
-    final AuthService authService = Get.find<AuthService>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Incidents'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              authService.logout();
-              Get.off(() => const AuthenticationScreen());
-            },
-          ),
-        ],
-      ),
-      body: Obx(() => ListView.builder(
-        itemCount: incidentService.incidents.length,
-        itemBuilder: (context, index) {
-          final incident = incidentService.incidents[index];
-          return ListTile(
-            title: Text(incident.title),
-            subtitle: Text(incident.description),
-            trailing: Text(incident.syncStatus),
-            // TODO: Add incident details view
-          );
-        },
-      )),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Get.to(() => const CreateIncidentScreen());
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }

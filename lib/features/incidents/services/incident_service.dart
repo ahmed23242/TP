@@ -8,22 +8,52 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/database/database_helper.dart';
 import '../models/incident.dart';
 import 'dart:developer' as developer;
+import '../../../core/network/connectivity_service.dart';
+import 'dart:async';
 
 class IncidentService extends GetxController {
   final _db = DatabaseHelper.instance;
   final _imagePicker = ImagePicker();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  late final ConnectivityService _connectivityService;
   
   RxList<Incident> incidents = <Incident>[].obs;
   RxBool isRecording = false.obs;
   String? _currentRecordingPath;
+  final RxBool isSyncing = false.obs;
   
   @override
   void onInit() {
     super.onInit();
+    // Initialize connectivity service
+    try {
+      _connectivityService = Get.find<ConnectivityService>();
+    } catch (e) {
+      _connectivityService = Get.put(ConnectivityService());
+    }
+    
+    // Set up periodic sync
+    _setupPeriodicSync();
+    
     // Initialisation différée pour éviter de bloquer le thread principal
     Future.delayed(Duration.zero, () async {
       await _initRecorder();
+    });
+  }
+
+  void _setupPeriodicSync() {
+    // Sync every 15 minutes if there are pending incidents
+    ever(_connectivityService.isConnected, (isConnected) {
+      if (isConnected) {
+        syncPendingIncidents();
+      }
+    });
+    
+    // Also set up a timer to check periodically
+    Timer.periodic(const Duration(minutes: 15), (_) async {
+      if (_connectivityService.isConnected.value) {
+        await syncPendingIncidents();
+      }
     });
   }
 
@@ -155,17 +185,84 @@ class IncidentService extends GetxController {
 
   // Sync operations
   Future<void> syncPendingIncidents() async {
+    // Skip if already syncing
+    if (isSyncing.value) {
+      developer.log('Sync already in progress, skipping');
+      return;
+    }
+    
     try {
+      isSyncing.value = true;
+      developer.log('Starting to sync pending incidents');
+      
+      // Check for internet connectivity
+      final bool isConnected = await _connectivityService.checkConnectivity();
+      if (!isConnected) {
+        developer.log('No internet connection, sync aborted');
+        return;
+      }
+      
+      // Get unsynced incidents
       final List<Map<String, dynamic>> unsyncedIncidents = 
           await _db.getUnsyncedIncidents();
-          
-      for (var incident in unsyncedIncidents) {
-        // TODO: Implement API call to sync incident with backend
-        // On successful sync:
-        await _db.updateIncidentSyncStatus(incident['id'], 'synced');
+      
+      if (unsyncedIncidents.isEmpty) {
+        developer.log('No pending incidents to sync');
+        return;
       }
-    } catch (e) {
-      print('Error syncing incidents: $e');
+      
+      developer.log('Found ${unsyncedIncidents.length} incidents to sync');
+      
+      // For each pending incident, try to sync with the server
+      for (var incidentMap in unsyncedIncidents) {
+        try {
+          final incident = Incident.fromMap(incidentMap);
+          
+          // TODO: Actually implement API call when backend is ready
+          // For now we'll simulate a successful sync with a delay
+          await Future.delayed(const Duration(seconds: 1));
+          
+          // After successful sync, update status in local DB
+          await _db.updateIncidentSyncStatus(incident.id, 'synced');
+          developer.log('Synced incident: ${incident.id}');
+          
+          // Update the incidents list if it contains this incident
+          final index = incidents.indexWhere((inc) => inc.id == incident.id);
+          if (index != -1) {
+            final updatedIncident = Incident(
+              id: incident.id,
+              title: incident.title,
+              description: incident.description,
+              photoPath: incident.photoPath,
+              photoUrl: incident.photoUrl,
+              voiceNotePath: incident.voiceNotePath,
+              latitude: incident.latitude,
+              longitude: incident.longitude,
+              createdAt: incident.createdAt,
+              status: incident.status,
+              incidentType: incident.incidentType,
+              syncStatus: 'synced',
+              userId: incident.userId,
+            );
+            incidents[index] = updatedIncident;
+          }
+        } catch (e, stackTrace) {
+          developer.log(
+            'Failed to sync incident ${incidentMap['id']}',
+            error: e,
+            stackTrace: stackTrace,
+          );
+          // Continue with other incidents even if one fails
+        }
+      }
+      
+      // Notify any listeners that incidents may have changed
+      incidents.refresh();
+      
+    } catch (e, stackTrace) {
+      developer.log('Error during sync operation', error: e, stackTrace: stackTrace);
+    } finally {
+      isSyncing.value = false;
     }
   }
 

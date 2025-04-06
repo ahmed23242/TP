@@ -17,6 +17,22 @@ class AuthService extends GetxController {
   final RxBool isBiometricEnabled = false.obs;
   final RxString userEmail = ''.obs;
 
+  // Liste d'utilisateurs valides pour démonstration
+  final List<Map<String, dynamic>> _validUsers = [
+    {
+      'id': 1,
+      'email': 'user@example.com',
+      'password': 'password123',
+      'role': 'user',
+    },
+    {
+      'id': 2,
+      'email': 'admin@example.com',
+      'password': 'admin123',
+      'role': 'admin',
+    },
+  ];
+
   @override
   void onInit() {
     super.onInit();
@@ -161,14 +177,23 @@ class AuthService extends GetxController {
     try {
       developer.log('Attempting login with credentials for email: $email');
       
-      // Simulate API call
+      // Vérifier si l'utilisateur existe et si le mot de passe est correct
+      final validUser = _validUsers.firstWhereOrNull(
+        (user) => user['email'] == email && user['password'] == password
+      );
+      
+      if (validUser == null) {
+        throw Exception('Identifiants invalides');
+      }
+      
+      // Simulate API call delay
       await Future.delayed(const Duration(seconds: 1));
       
       // Store user data in local database
       final user = {
-        'id': 1, // ID utilisateur explicite pour éviter les problèmes d'authentification
-        'email': email,
-        'role': 'user', // Default role
+        'id': validUser['id'], 
+        'email': validUser['email'],
+        'role': validUser['role'],
         'token': 'auth_token_${DateTime.now().millisecondsSinceEpoch}',
         'last_login': DateTime.now().toIso8601String(),
       };

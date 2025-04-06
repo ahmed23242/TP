@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../repositories/auth_repository.dart';
 import '../services/auth_service.dart';
 import 'dart:developer' as developer;
+import '../../../features/incidents/controllers/incident_controller.dart';
 
 class AuthController extends GetxController {
   final AuthRepository _authRepository = AuthRepository();
@@ -90,7 +91,28 @@ class AuthController extends GetxController {
           developer.log('Created basic user data for biometric auth: ${userData.value}');
         }
         
-        Get.offAllNamed('/home');
+        // Assurez-vous que les données utilisateur contiennent un ID
+        if (!userData.value!.containsKey('id') || userData.value!['id'] == null) {
+          userData.value!['id'] = 1;
+          developer.log('Added default ID to user data: ${userData.value}');
+        }
+        
+        // Vérifiez si nous sommes actuellement sur la route de l'accueil
+        if (Get.currentRoute == '/home') {
+          // Recharger les incidents
+          try {
+            // Utiliser un bloc try-catch pour éviter des erreurs si le controller n'est pas disponible
+            if (Get.isRegistered<IncidentController>()) {
+              final incidentController = Get.find<IncidentController>();
+              incidentController.loadIncidents();
+            }
+          } catch (e) {
+            developer.log('Failed to reload incidents', error: e);
+          }
+        } else {
+          // Naviguez vers l'écran d'accueil
+          Get.offAllNamed('/home');
+        }
       } else {
         Get.snackbar(
           'Error',

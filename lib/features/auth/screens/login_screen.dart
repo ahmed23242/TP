@@ -195,6 +195,39 @@ class LoginScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    // Demo Users Info
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Utilisateurs de démonstration:',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildDemoUserInfo(
+                            email: 'user@example.com',
+                            password: 'password123',
+                            role: 'Citoyen',
+                          ),
+                          const SizedBox(height: 4),
+                          _buildDemoUserInfo(
+                            email: 'admin@example.com',
+                            password: 'admin123',
+                            role: 'Administrateur',
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -202,6 +235,38 @@ class LoginScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+  
+  Widget _buildDemoUserInfo({
+    required String email,
+    required String password,
+    required String role,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: Text(
+            email,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text(
+            password,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text(
+            role,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }
