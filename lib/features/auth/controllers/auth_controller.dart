@@ -52,10 +52,15 @@ class AuthController extends GetxController {
         final success = await _authService.authenticateWithBiometrics();
         if (success) {
           userData.value = await _authRepository.getUserData();
+          developer.log('Automatic biometric authentication successful, user data: ${userData.value}');
           Get.offAllNamed('/home');
           isCheckingAuth.value = false;
           return;
+        } else {
+          developer.log('Biometric authentication failed, falling back to token check');
         }
+      } else {
+        developer.log('Biometric authentication not available or not enabled');
       }
       
       // Si la biométrie ne fonctionne pas ou n'est pas configurée, vérifier le token JWT classique
@@ -68,6 +73,8 @@ class AuthController extends GetxController {
           Get.offAllNamed('/login');
         }
       }
+    } catch (e, stackTrace) {
+      developer.log('Error checking auth status', error: e, stackTrace: stackTrace);
     } finally {
       isCheckingAuth.value = false;
     }
@@ -132,13 +139,27 @@ class AuthController extends GetxController {
       );
       
       if (success) {
-        Get.offAllNamed('/home');
+        // Récupérer les données utilisateur après inscription
+        userData.value = await _authRepository.getUserData();
         
         // Après la première inscription réussie, vérifier si on peut demander l'activation de la biométrie
         final bool canUseBio = await _authService.canUseBiometrics();
+        developer.log('Registration successful, canUseBiometrics: $canUseBio');
+        
         if (canUseBio) {
           // Indiquer qu'on doit demander à l'utilisateur s'il veut activer la biométrie
           shouldAskForBiometric.value = true;
+          developer.log('Setting shouldAskForBiometric to TRUE');
+        }
+        
+        // D'abord afficher le dialogue, puis rediriger vers l'écran d'accueil
+        if (shouldAskForBiometric.value) {
+          Get.offAllNamed('/home');
+          // Attendre un court délai pour s'assurer que l'écran d'accueil est chargé
+          await Future.delayed(Duration(milliseconds: 800));
+          _showBiometricPrompt();
+        } else {
+          Get.offAllNamed('/home');
         }
       } else {
         errorMessage.value = 'Un compte avec cet email existe déjà';
@@ -149,6 +170,42 @@ class AuthController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+  
+  void _showBiometricPrompt() {
+    if (Get.isDialogOpen ?? false) {
+      Get.back();
+    }
+    
+    // Utiliser un délai supplémentaire pour éviter les conflits avec d'autres dialogs
+    Future.delayed(Duration(milliseconds: 300), () {
+      Get.dialog(
+        AlertDialog(
+          title: const Text('Activer la biométrie'),
+          content: const Text(
+            'Souhaitez-vous activer la connexion par empreinte digitale ou reconnaissance faciale pour faciliter vos futures connexions?'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Get.back();
+                cancelBiometricEnabling();
+              },
+              child: const Text('Plus tard'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Get.back();
+                await enableBiometricAuthentication();
+              },
+              child: const Text('Activer'),
+            ),
+          ],
+        ),
+        barrierDismissible: false,
+        name: 'biometricPrompt',
+      );
+    });
   }
   
   Future<void> loginWithBiometrics() async {
@@ -235,5 +292,43 @@ class AuthController extends GetxController {
   // Réinitialiser le flag si l'utilisateur refuse d'activer la biométrie
   void cancelBiometricEnabling() {
     shouldAskForBiometric.value = false;
+  }
+
+  // Nouvelle méthode pour essayer la connexion biométrique depuis l'écran de login
+  Future<void> tryBiometricLogin() async {
+    if (isLoading.value) return;
+    isLoading.value = true;
+    
+    try {
+      // Vérifier si la biométrie est disponible et activée
+      final canUseBiometric = await _authService.canUseBiometrics();
+      final biometricEnabled = await _authService.checkBiometricEnabled();
+      
+      if (canUseBiometric && biometricEnabled) {
+        final success = await _authService.authenticateWithBiometrics();
+        if (success) {
+          userData.value = await _authRepository.getUserData();
+          developer.log('Biometric login successful from login screen, user data: ${userData.value}');
+          Get.offAllNamed('/home');
+          return;
+        } else {
+          Get.snackbar(
+            'Échec de l\'authentification', 
+            'Veuillez vous connecter avec votre email et mot de passe',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+        }
+      } else {
+        Get.snackbar(
+          'Biométrie indisponible', 
+          'Connectez-vous avec votre email et mot de passe',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      developer.log('Error during biometric login attempt', error: e);
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

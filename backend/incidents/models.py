@@ -28,20 +28,23 @@ class Incident(models.Model):
     
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    incident_type = models.CharField(max_length=20, choices=INCIDENT_TYPES, default='general')
+    photo_path = models.CharField(max_length=255, blank=True, null=True)  # Chemin local sur le mobile
     photo = models.ImageField(upload_to='incidents/photos/', null=True, blank=True)
     photo_url = models.URLField(blank=True, null=True)  # Pour stocker l'URL après upload
+    voice_note_path = models.CharField(max_length=255, blank=True, null=True)  # Chemin local sur le mobile
     voice_note = models.FileField(upload_to='incidents/voice_notes/', null=True, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField()  # Pas auto_now_add pour permettre la synchronisation avec timestamp du mobile
     updated_at = models.DateTimeField(auto_now=True)
+    incident_type = models.CharField(max_length=20, choices=INCIDENT_TYPES, default='general')
     sync_status = models.CharField(max_length=20, choices=SYNC_STATUS_CHOICES, default='synced')
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='incidents'
+        related_name='incidents',
+        db_column='user_id'  # Pour correspondre exactement à la BD SQLite
     )
 
     class Meta:

@@ -24,10 +24,11 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    // Charger les incidents si la liste est vide
-    if (_incidentController.incidents.isEmpty) {
+    // Utiliser Future.microtask ou Future.delayed pour éviter
+    // d'appeler loadIncidents pendant le build
+    Future.microtask(() {
       _incidentController.loadIncidents();
-    }
+    });
   }
   
   List<Incident> _getFilteredIncidents() {
@@ -100,25 +101,33 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
           
           if (incidents.isEmpty) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.warning_amber_rounded, size: 64, color: Colors.amber),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Aucun incident trouvé',
-                    style: TextStyle(fontSize: 18),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, size: 64, color: Colors.amber),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Aucun incident trouvé',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => _incidentController.loadIncidents(),
+                        child: const Text('Actualiser'),
+                      ),
+                      TextButton(
+                        onPressed: () => Get.toNamed('/incident/create'),
+                        child: const Text('Signaler un incident'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => _incidentController.loadIncidents(),
-                    child: const Text('Actualiser'),
-                  ),
-                  TextButton(
-                    onPressed: () => Get.toNamed('/incident/create'),
-                    child: const Text('Signaler un incident'),
-                  ),
-                ],
+                ),
               ),
             );
           }
@@ -150,11 +159,20 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   void _showFilterBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Permet à la feuille de défilement de prendre plus d'espace
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return Container(
-              padding: const EdgeInsets.all(16),
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                left: 16, 
+                right: 16,
+                top: 16
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

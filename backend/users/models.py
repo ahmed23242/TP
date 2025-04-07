@@ -10,7 +10,9 @@ class User(AbstractUser):
     )
     
     email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=15, blank=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    password = models.CharField(max_length=128)
+    phone = models.CharField(max_length=15, blank=True, null=True)
     role = models.CharField(max_length=10, choices=ROLES, default='user')
     token = models.CharField(max_length=255, blank=True, null=True)
     last_login = models.DateTimeField(blank=True, null=True)

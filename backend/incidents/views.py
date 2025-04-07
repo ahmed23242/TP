@@ -46,25 +46,43 @@ class IncidentViewSet(viewsets.ModelViewSet):
             
         results = []
         for incident_data in incidents_data:
+            # Conserver le created_at tel qu'il a été défini côté mobile
+            created_at = incident_data.get('created_at')
+            
             # Vérifier si l'incident existe déjà (en cas de resync)
+            existing_incident = None
             if 'id' in incident_data and Incident.objects.filter(id=incident_data['id']).exists():
                 # Mettre à jour l'incident existant
-                incident = Incident.objects.get(id=incident_data['id'])
-                serializer = self.get_serializer(incident, data=incident_data, partial=True)
+                existing_incident = Incident.objects.get(id=incident_data['id'])
+                serializer = self.get_serializer(existing_incident, data=incident_data, partial=True)
             else:
                 # Créer un nouvel incident
                 serializer = self.get_serializer(data=incident_data)
                 
             if serializer.is_valid():
-                serializer.save(user=request.user, sync_status='synced')
+                # Enregistrer les chemins locaux du mobile si fournis
+                photo_path = incident_data.get('photo_path')
+                voice_note_path = incident_data.get('voice_note_path')
+                
+                # Enregistrer l'incident avec tous les champs nécessaires
+                saved_incident = serializer.save(
+                    user=request.user, 
+                    sync_status='synced',
+                    photo_path=photo_path,
+                    voice_note_path=voice_note_path
+                )
+                
+                # Si l'incident a été synchronisé avec succès, renvoyer les données mises à jour
                 results.append({
                     'success': True,
-                    'data': serializer.data
+                    'data': self.get_serializer(saved_incident).data,
+                    'message': 'Incident synchronisé avec succès'
                 })
             else:
                 results.append({
                     'success': False,
-                    'errors': serializer.errors
+                    'errors': serializer.errors,
+                    'message': 'Erreur lors de la synchronisation'
                 })
                 
         return Response(results, status=status.HTTP_200_OK)

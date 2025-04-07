@@ -111,20 +111,21 @@ class LoginScreen extends StatelessWidget {
                 
                 // Bouton d'authentification biométrique
                 FutureBuilder<bool>(
-                  future: _authService.canUseBiometrics(),
+                  future: _isBiometricLoginAvailable(),
                   builder: (context, snapshot) {
-                    final canUseBiometrics = snapshot.data ?? false;
-                    
-                    if (!canUseBiometrics) {
-                      return const SizedBox.shrink();
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ElevatedButton.icon(
+                        onPressed: () => _authController.tryBiometricLogin(),
+                        icon: const Icon(Icons.fingerprint),
+                        label: const Text('Se connecter avec la biométrie'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
+                      );
                     }
-                    
-                    return CustomButton(
-                      text: 'Se connecter avec la biométrie',
-                      icon: Icons.fingerprint,
-                      isOutlined: true,
-                      onPressed: () => _authController.loginWithBiometrics(),
-                    );
+                    return const SizedBox.shrink(); // Cache le bouton si non disponible
                   },
                 ),
               ],
@@ -180,5 +181,11 @@ class LoginScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<bool> _isBiometricLoginAvailable() async {
+    final canUse = await _authService.canUseBiometrics();
+    final isEnabled = await _authService.checkBiometricEnabled();
+    return canUse && isEnabled;
   }
 }

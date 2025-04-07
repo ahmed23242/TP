@@ -100,10 +100,21 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getUserByEmail(String email) async {
     final db = await database;
-    final List<Map<String, dynamic>> results = await db.query(
+    final results = await db.query(
       'users',
       where: 'email = ?',
       whereArgs: [email],
+      limit: 1,
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<Map<String, dynamic>?> getUserById(int id) async {
+    final db = await database;
+    final results = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
       limit: 1,
     );
     return results.isNotEmpty ? results.first : null;

@@ -1,9 +1,14 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:developer' as developer;
 
 class ApiClient {
-  static const String baseUrl = 'http://10.0.2.2:8000/api'; // For Android Emulator
+  // static const String baseUrl = 'http://10.0.2.2:8000/api'; // For Android Emulator
+  // static const String baseUrl = 'http://172.20.10.18:8000/api'; // Adresse IP de l'ordinateur
+  
+  // Adresse IP Wi-Fi de l'ordinateur (d'après la commande ipconfig)
+  static const String baseUrl = 'http://172.20.10.18:8000/api';
+  
   final Dio _dio = Dio();
   final _storage = const FlutterSecureStorage();
 
@@ -12,7 +17,7 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // Add token to request if it exists
-          final token = await _storage.read(key: 'access_token');
+          final token = await _storage.read(key: 'jwt_token');
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -30,7 +35,7 @@ class ApiClient {
                 );
                 
                 final newToken = response.data['access'];
-                await _storage.write(key: 'access_token', value: newToken);
+                await _storage.write(key: 'jwt_token', value: newToken);
                 
                 // Retry the original request
                 error.requestOptions.headers['Authorization'] = 'Bearer $newToken';
@@ -66,7 +71,7 @@ class ApiClient {
         data: {'username': username, 'password': password},
       );
       
-      await _storage.write(key: 'access_token', value: response.data['access']);
+      await _storage.write(key: 'jwt_token', value: response.data['access']);
       await _storage.write(key: 'refresh_token', value: response.data['refresh']);
       
       return response.data;
@@ -134,7 +139,7 @@ class ApiClient {
       try {
         await createIncident(incident);
       } catch (e) {
-        print('Error syncing incident: $e');
+        developer.log('Error syncing incident: $e');
         // Continue with next incident even if one fails
         continue;
       }

@@ -10,6 +10,8 @@ import '../models/incident.dart';
 import 'dart:developer' as developer;
 import '../../../core/network/connectivity_service.dart';
 import 'dart:async';
+import '../../../core/network/api_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class IncidentService extends GetxController {
   final _db = DatabaseHelper.instance;
@@ -213,54 +215,79 @@ class IncidentService extends GetxController {
       
       developer.log('Found ${unsyncedIncidents.length} incidents to sync');
       
+      // Obtenir le service API pour envoyer les données
+      final apiService = Get.find<ApiService>();
+      
+      // Vérifier le token avant de commencer
+      final token = await const FlutterSecureStorage().read(key: 'jwt_token');
+      if (token == null) {
+        developer.log('Syncing incidents failed: No authentication token found');
+        return;
+      }
+      developer.log('Using token for sync: ${token.substring(0, 10)}...');
+      
       // For each pending incident, try to sync with the server
       for (var incidentMap in unsyncedIncidents) {
         try {
           final incident = Incident.fromMap(incidentMap);
           
-          // TODO: Actually implement API call when backend is ready
-          // For now we'll simulate a successful sync with a delay
-          await Future.delayed(const Duration(seconds: 1));
+          // Préparer les données pour l'API en format complet
+          final Map<String, dynamic> incidentData = {
+            'title': incident.title,
+            'description': incident.description,
+            'latitude': incident.latitude,
+            'longitude': incident.longitude,
+            'incident_type': incident.incidentType,
+            'created_at': incident.createdAt.toIso8601String(),
+            'user': incident.userId, // Changé de 'user_id' à 'user' pour correspondre au modèle Django
+            'status': 'pending',
+          };
           
-          // After successful sync, update status in local DB
-          await _db.updateIncidentSyncStatus(incident.id, 'synced');
-          developer.log('Synced incident: ${incident.id}');
+          developer.log('Preparing to sync incident: ${incident.id}');
+          developer.log('With data: $incidentData');
           
-          // Update the incidents list if it contains this incident
-          final index = incidents.indexWhere((inc) => inc.id == incident.id);
-          if (index != -1) {
-            final updatedIncident = Incident(
-              id: incident.id,
-              title: incident.title,
-              description: incident.description,
-              photoPath: incident.photoPath,
-              photoUrl: incident.photoUrl,
-              voiceNotePath: incident.voiceNotePath,
-              latitude: incident.latitude,
-              longitude: incident.longitude,
-              createdAt: incident.createdAt,
-              status: incident.status,
-              incidentType: incident.incidentType,
-              syncStatus: 'synced',
-              userId: incident.userId,
-            );
-            incidents[index] = updatedIncident;
+          // Appel direct de l'API pour créer un incident
+          // au lieu d'utiliser la méthode syncIncident
+          try {
+            final response = await apiService.createIncident(incidentData);
+            developer.log('API response for incident ${incident.id}: $response');
+            
+            // Après synchronisation réussie, mettre à jour le statut dans la DB locale
+            await _db.updateIncidentSyncStatus(incident.id, 'synced');
+            developer.log('Synced incident: ${incident.id}');
+            
+            // Update the incidents list if it contains this incident
+            final index = incidents.indexWhere((inc) => inc.id == incident.id);
+            if (index != -1) {
+              final updatedIncident = Incident(
+                id: incident.id,
+                title: incident.title,
+                description: incident.description,
+                photoPath: incident.photoPath,
+                photoUrl: incident.photoUrl,
+                voiceNotePath: incident.voiceNotePath,
+                latitude: incident.latitude,
+                longitude: incident.longitude,
+                createdAt: incident.createdAt,
+                status: incident.status,
+                incidentType: incident.incidentType,
+                syncStatus: 'synced',
+                userId: incident.userId,
+              );
+              incidents[index] = updatedIncident;
+            }
+          } catch (apiError) {
+            developer.log('API error syncing incident ${incident.id}', error: apiError);
+            // Ne pas marquer comme synchronisé en cas d'erreur
           }
         } catch (e, stackTrace) {
-          developer.log(
-            'Failed to sync incident ${incidentMap['id']}',
-            error: e,
-            stackTrace: stackTrace,
-          );
-          // Continue with other incidents even if one fails
+          developer.log('Error processing incident for sync', error: e, stackTrace: stackTrace);
         }
       }
       
-      // Notify any listeners that incidents may have changed
-      incidents.refresh();
-      
+      developer.log('Sync process completed');
     } catch (e, stackTrace) {
-      developer.log('Error during sync operation', error: e, stackTrace: stackTrace);
+      developer.log('Error during sync process', error: e, stackTrace: stackTrace);
     } finally {
       isSyncing.value = false;
     }

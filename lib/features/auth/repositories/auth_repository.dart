@@ -125,44 +125,56 @@ class AuthRepository {
 
   Future<Map<String, dynamic>?> getUserData() async {
     try {
-      // D'abord, essayer de récupérer les données du token
-      final token = await getToken();
-      if (token != null) {
-        try {
-          final userData = JwtDecoder.decode(token);
-          developer.log('User data retrieved from token: ${userData.toString()}');
-          
-          // Ajouter un ID utilisateur par défaut si manquant
-          if (!userData.containsKey('id')) {
-            userData['id'] = 1;
-          }
-          
+      // 1. Essayer d'obtenir l'ID utilisateur depuis le stockage sécurisé
+      final userId = await _storage.read(key: 'user_id');
+      if (userId != null) {
+        developer.log('User ID found in secure storage: $userId');
+        
+        // 2. Récupérer les données utilisateur complètes depuis la base de données
+        final userData = await _db.getUserById(int.parse(userId));
+        if (userData != null) {
+          developer.log('User data retrieved from database using stored ID: ${userData.toString()}');
           return userData;
-        } catch (e) {
-          developer.log('Failed to decode token, will try database', error: e);
-          // Continuer à essayer avec la base de données
         }
       }
       
-      // Si pas de token ou décodage échoué, essayer de récupérer depuis la base de données
+      // 3. Si pas d'ID ou données introuvables, essayer de récupérer les données du token
+      final token = await getToken();
+      if (token != null) {
+        try {
+          final tokenData = JwtDecoder.decode(token);
+          developer.log('User data retrieved from token: ${tokenData.toString()}');
+          
+          // 4. Si le token contient un ID, le stocker pour utilisation future
+          if (tokenData.containsKey('id') || tokenData.containsKey('user_id')) {
+            final id = tokenData['id'] ?? tokenData['user_id'];
+            await _storage.write(key: 'user_id', value: id.toString());
+            developer.log('Saved user ID to secure storage: $id');
+            return tokenData;
+          }
+        } catch (e) {
+          developer.log('Failed to decode token, will try database', error: e);
+        }
+      }
+      
+      // 5. Si pas de token ou décodage échoué, essayer de récupérer depuis la base de données par email
       final email = _authService.userEmail.value;
       if (email.isNotEmpty) {
-        // Utiliser direct DatabaseHelper qui est accessible
-        final db = DatabaseHelper.instance;
-        final user = await db.getUserByEmail(email);
+        final user = await _db.getUserByEmail(email);
         if (user != null) {
-          developer.log('User data retrieved from database: ${user.toString()}');
+          developer.log('User data retrieved from database by email: ${user.toString()}');
           
-          // Ajouter un ID utilisateur par défaut si manquant
-          if (!user.containsKey('id')) {
-            user['id'] = 1;
+          // Stocker l'ID pour utilisation future
+          if (user.containsKey('id')) {
+            await _storage.write(key: 'user_id', value: user['id'].toString());
+            developer.log('Saved user ID to secure storage from email lookup: ${user['id']}');
           }
           
           return user;
         }
       }
       
-      // En dernier recours, créer des données utilisateur de base
+      // 6. En dernier recours, créer des données utilisateur de base
       if (_authService.isAuthenticated.value) {
         final fallbackData = {
           'id': 1,
@@ -170,6 +182,11 @@ class AuthRepository {
           'role': _authService.userRole.value
         };
         developer.log('Created fallback user data: ${fallbackData.toString()}');
+        
+        // Stocker l'ID par défaut
+        await _storage.write(key: 'user_id', value: '1');
+        developer.log('Saved fallback user ID to secure storage: 1');
+        
         return fallbackData;
       }
       

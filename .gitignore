@@ -71,3 +71,51 @@ app.*.map.json
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
+
+# Fichiers sensibles et clés API
+**/*.env
+**/.env*
+**/key.properties
+**/google-services.json
+**/GoogleService-Info.plist
+**/keys.dart
+**/secrets.dart
+**/api_keys.dart
+**/lib/config/env.dart
+**/lib/core/config/secrets.dart
+**/android/app/src/main/AndroidManifest.xml
+**/ios/Runner/AppDelegate.swift
+**/lib/firebase_options.dart
+
+# Base de données locales
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/backend/db.sqlite3
+
+# Fichiers média et assets utilisateur
+**/assets/user_uploads/
+**/assets/temp/
+**/incidents/photos/
+**/incidents/voice_notes/
+**/backend/media/
+
+# Certificats et clés de signing
+**/*.keystore
+**/*.jks
+**/*.p12
+**/*.pem
+**/*.key
+**/*.crt
+**/ios/Runner.ipa
+**/ios/Runner.app.dSYM.zip
+
+# Fichiers Python/Django spécifiques
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/migrations/*.py
+!**/migrations/__init__.py
+**/staticfiles/
+**/.env.local
+**/backend/incidents_api/settings_local.py

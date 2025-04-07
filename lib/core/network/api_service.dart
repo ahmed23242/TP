@@ -6,9 +6,13 @@ import 'dart:developer' as developer;
 
 class ApiService extends GetxController {
   // URL de base de l'API
-  static const String baseUrl = 'http://10.0.2.2:8000/api'; // Pour l'émulateur Android
+  // static const String baseUrl = 'http://10.0.2.2:8000/api'; // Pour l'émulateur Android
+  // static const String baseUrl = 'http://172.20.10.18:8000/api'; // Adresse IP de l'ordinateur
   // static const String baseUrl = 'http://localhost:8000/api'; // Pour le développement local
   // static const String baseUrl = 'https://votre-api-de-production.com/api'; // Pour la production
+  
+  // Adresse IP Wi-Fi de l'ordinateur (d'après la commande ipconfig)
+  static const String baseUrl = 'http://172.20.10.18:8000/api';
   
   final _storage = const FlutterSecureStorage();
   final RxBool isConnected = false.obs;
@@ -28,21 +32,38 @@ class ApiService extends GetxController {
   
   Future<void> _checkConnection() async {
     try {
-      final response = await http.get(Uri.parse(baseUrl));
-      isConnected.value = response.statusCode < 400;
+      // Utiliser une route qui n'exige pas d'authentification
+      // La route de base de l'API devrait retourner une erreur 404 mais pas une erreur de connexion
+      final response = await http.get(Uri.parse('$baseUrl/../health-check/'));
+      isConnected.value = true; // Si la requête réussit sans exception
       developer.log('API connection status: ${isConnected.value}');
+      // Afficher une partie limitée de la réponse pour éviter les logs trop longs
+      final bodyPreview = response.body.length > 100 
+          ? response.body.substring(0, 100) + '...' 
+          : response.body;
+      developer.log('API response: ${response.statusCode} - $bodyPreview');
     } catch (e) {
-      isConnected.value = false;
-      developer.log('API connection failed: $e');
+      // Même avec une erreur 404, nous pouvons considérer que la connexion est établie
+      // car l'erreur 404 signifie que nous avons atteint le serveur
+      if (e is http.ClientException) {
+        isConnected.value = false;
+        developer.log('API connection failed: $e');
+      } else {
+        // Pour les autres erreurs (comme 404), le serveur est joignable
+        isConnected.value = true;
+        developer.log('API reachable with error: $e');
+      }
     }
   }
   
   // Méthode pour obtenir les en-têtes d'authentification
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = await _storage.read(key: 'jwt_token');
+    developer.log('Using JWT token: ${token != null ? "Valid token present" : "Token is null"}');
+    
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
+      'Authorization': token != null ? 'Bearer $token' : '',
     };
   }
   
@@ -225,13 +246,18 @@ class ApiService extends GetxController {
     try {
       final token = await _getValidToken();
       if (token == null) {
+        developer.log('Sync failed: Not authenticated (token is null)');
         throw Exception('Not authenticated');
       }
       
       await _checkConnection();
       if (!isConnected.value) {
+        developer.log('Sync failed: No internet connection');
         throw Exception('No internet connection');
       }
+      
+      developer.log('Attempting to sync incident to: ${incidentsEndpoint}');
+      developer.log('With data: ${jsonEncode(incidentData)}');
       
       // Pour l'envoi de fichiers, il faudrait utiliser multipart/form-data
       // Mais pour simplifier, nous utiliserons juste application/json
@@ -241,9 +267,14 @@ class ApiService extends GetxController {
         body: jsonEncode(incidentData),
       );
       
+      developer.log('Sync response status: ${response.statusCode}');
+      developer.log('Sync response body: ${response.body}');
+      
       if (response.statusCode == 201) {
+        developer.log('Incident successfully synced to server');
         return jsonDecode(response.body);
       } else {
+        developer.log('Sync failed with status: ${response.statusCode}, body: ${response.body}');
         throw Exception('Failed to sync incident: ${response.body}');
       }
     } catch (e) {

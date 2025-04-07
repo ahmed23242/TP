@@ -1,14 +1,19 @@
+import 'package:accidentsapp/features/auth/services/auth_service.dart';
+import 'package:accidentsapp/features/incidents/models/incident.dart';
+import 'package:accidentsapp/features/incidents/services/incident_service.dart';
+import 'package:accidentsapp/features/auth/controllers/auth_controller.dart';
 import 'package:get/get.dart';
-import '../models/incident.dart';
-import '../services/incident_service.dart';
-import '../../auth/controllers/auth_controller.dart';
 import 'dart:developer' as developer;
 
 class IncidentController extends GetxController {
-  final _incidentService = IncidentService();
-  final incidents = <Incident>[].obs;
-  final isLoading = false.obs;
-
+  final IncidentService _incidentService = Get.find<IncidentService>();
+  
+  final RxList<Incident> incidents = <Incident>[].obs;
+  final RxBool isLoading = false.obs;
+  final RxString filterStatus = 'all'.obs;
+  final RxString filterType = 'all'.obs;
+  final RxString sortBy = 'date'.obs;
+  
   @override
   void onInit() {
     super.onInit();
@@ -20,30 +25,31 @@ class IncidentController extends GetxController {
 
   Future<void> loadIncidents() async {
     try {
-      isLoading.value = true;
-      AuthController? authController;
-      try {
-        authController = Get.find<AuthController>();
-      } catch (e) {
-        developer.log('AuthController not found, skipping incident loading', error: e);
+      final authService = Get.find<AuthService>();
+      final userId = authService.currentUserId.value;
+      
+      if (userId == null) {
+        developer.log('User ID not found, unable to load incidents');
+        // Ne pas utiliser Get.snackbar pendant le build d'un widget
+        // Get.snackbar('Erreur', 'Identifiant utilisateur non trouvé');
+        isLoading.value = false;
         return;
       }
       
-      final userId = authController.userData.value?['id'];
-      if (userId != null) {
-        final userIncidents = await _incidentService.getUserIncidents(userId);
-        incidents.assignAll(userIncidents);
-        developer.log('Loaded ${incidents.length} incidents');
-      } else {
-        developer.log('User ID not found, unable to load incidents');
+      final loadedIncidents = await _incidentService.getUserIncidents(userId);
+      
+      // S'assurer qu'il n'y a pas de doublons (par ID)
+      final Map<int, Incident> uniqueIncidents = {};
+      for (var incident in loadedIncidents) {
+        uniqueIncidents[incident.id] = incident;
       }
-    } catch (e, stackTrace) {
-      developer.log('Error loading incidents', error: e, stackTrace: stackTrace);
-      Get.snackbar(
-        'Error',
-        'Failed to load incidents',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      
+      incidents.value = uniqueIncidents.values.toList();
+      developer.log('Loaded ${incidents.value.length} incidents');
+    } catch (e) {
+      developer.log('Error loading incidents', error: e);
+      // Ne pas utiliser Get.snackbar pendant le build d'un widget
+      // Get.snackbar('Erreur', 'Impossible de charger les incidents');
     } finally {
       isLoading.value = false;
     }
@@ -73,9 +79,25 @@ class IncidentController extends GetxController {
         developer.log('AuthController not found, using default user ID', error: e);
       }
       
+      // Générer un ID unique basé sur le timestamp
+      final incidentId = DateTime.now().millisecondsSinceEpoch;
+      
+      // Vérifier si un incident similaire existe déjà (dans les 2 dernières secondes)
+      final duplicateCheck = incidents.any((inc) => 
+        (incidentId - inc.id).abs() < 2000 && // Créé dans les 2 dernières secondes
+        inc.title == title &&
+        inc.latitude == latitude &&
+        inc.longitude == longitude
+      );
+      
+      if (duplicateCheck) {
+        developer.log('Duplicate incident detected, ignoring');
+        return;
+      }
+      
       // Créer l'incident avec l'ID utilisateur récupéré ou la valeur par défaut
       final incident = Incident(
-        id: DateTime.now().millisecondsSinceEpoch,
+        id: incidentId,
         title: title,
         description: description,
         photoPath: photoPath,

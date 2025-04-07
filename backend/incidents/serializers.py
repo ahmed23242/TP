@@ -13,10 +13,11 @@ class IncidentSerializer(serializers.ModelSerializer):
         model = Incident
         fields = (
             'id', 'title', 'description', 'incident_type', 'photo', 'photo_url',
-            'voice_note', 'voice_note_url', 'latitude', 'longitude', 'status',
-            'created_at', 'updated_at', 'user', 'sync_status'
+            'photo_path', 'voice_note', 'voice_note_url', 'voice_note_path', 
+            'latitude', 'longitude', 'status', 'created_at', 'updated_at', 
+            'user', 'sync_status'
         )
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'updated_at')
 
     def get_photo_url(self, obj):
         if obj.photo:
@@ -38,5 +39,5 @@ class IncidentSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'phone_number', 'role')
+        fields = ('id', 'username', 'email', 'phone', 'role', 'name', 'token', 'last_login')
         read_only_fields = ('id',)

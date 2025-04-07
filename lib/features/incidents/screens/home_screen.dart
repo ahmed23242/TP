@@ -22,7 +22,18 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.all(8.0),
             child: connectivityService.isConnected.value
               ? const Icon(Icons.wifi, color: Colors.green)
-              : const Icon(Icons.wifi_off, color: Colors.red),
+              : Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.wifi_off, color: Colors.red),
+                    Container(
+                      width: 20,
+                      height: 2,
+                      color: Colors.red,
+                      transform: Matrix4.rotationZ(0.785398), // 45 degrés en radians
+                    ),
+                  ],
+                ),
           )),
           IconButton(
             icon: const Icon(Icons.sync),
@@ -130,21 +141,29 @@ class HomeScreen extends StatelessWidget {
 
                 if (incidentController.incidents.isEmpty) {
                   return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.warning_amber_rounded, size: 64),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Aucun incident signalé',
-                          style: TextStyle(fontSize: 18),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.6,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 64),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Aucun incident signalé',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => Get.toNamed('/incident/create'),
+                              child: const Text('Signaler un incident'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: () => Get.toNamed('/incident/create'),
-                          child: const Text('Signaler un incident'),
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 }
@@ -193,22 +212,26 @@ class HomeScreen extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(12.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
-                size: 40,
+                size: 32,
                 color: color,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: color,
+                  fontSize: 13,
                 ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
