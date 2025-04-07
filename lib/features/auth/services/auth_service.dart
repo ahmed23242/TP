@@ -251,16 +251,28 @@ class AuthService extends GetxController {
       );
       
       if (didAuthenticate) {
-        // If user authenticated successfully with biometrics, check if they have an account
-        final userIdStr = await _storage.read(key: 'user_id');
-        if (userIdStr != null) {
+        // Récupérer l'ID et l'email associés à la biométrie
+        final userIdStr = await _storage.read(key: 'biometric_user_id');
+        final email = await _storage.read(key: 'biometric_user_email');
+        
+        if (userIdStr != null && email != null) {
           final userId = int.parse(userIdStr);
+          
+          // Mettre à jour les informations de connexion
           currentUserId.value = userId;
+          userEmail.value = email;
           isLoggedIn.value = true;
+          
+          // Charger les données de l'utilisateur depuis la base de données
+          final userData = await _db.getUserByEmail(email);
+          if (userData != null) {
+            userRole.value = userData['role'] as String? ?? 'user';
+          }
+          
+          developer.log('Biometric authentication successful for user $email (ID: $userId)');
           return true;
         } else {
-          // User authenticated with biometrics but doesn't have an account yet
-          developer.log('Biometric authentication successful but no account found');
+          developer.log('Biometric authentication successful but user data not found');
           return false;
         }
       }
@@ -430,8 +442,11 @@ class AuthService extends GetxController {
           return false;
         }
         
-        // Stocker l'email pour les futures authentifications biométriques
+        // Stocker les informations nécessaires pour les futures authentifications biométriques
         await _storage.write(key: 'biometric_enabled', value: 'true');
+        await _storage.write(key: 'biometric_user_id', value: userId.toString());
+        await _storage.write(key: 'biometric_user_email', value: email);
+        
         isBiometricEnabled.value = true;
         
         developer.log('Successfully associated biometrics with user: $email (ID: $userId)');
@@ -442,6 +457,17 @@ class AuthService extends GetxController {
       }
     } catch (e) {
       developer.log('Error associating biometrics with account', error: e);
+      return false;
+    }
+  }
+
+  // Méthode pour vérifier si la biométrie est activée
+  Future<bool> checkBiometricEnabled() async {
+    try {
+      final biometricEnabled = await _storage.read(key: 'biometric_enabled');
+      return biometricEnabled == 'true';
+    } catch (e) {
+      developer.log('Error checking if biometric is enabled', error: e);
       return false;
     }
   }

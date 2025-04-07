@@ -4,22 +4,65 @@ import '../../incidents/controllers/incident_controller.dart';
 import '../../incidents/widgets/incident_card.dart';
 import '../../auth/controllers/auth_controller.dart';
 
-class HomeScreen extends StatelessWidget {
-  HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final IncidentController _incidentController = Get.find<IncidentController>();
   final AuthController _authController = Get.find<AuthController>();
+  
+  @override
+  void initState() {
+    super.initState();
+    _incidentController.loadIncidents();
+    
+    // Vérifier si nous devons demander l'activation de la biométrie
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBiometricPrompt();
+    });
+  }
+  
+  void _checkBiometricPrompt() {
+    if (_authController.shouldAskForBiometric.value) {
+      _showBiometricEnableDialog();
+    }
+  }
+  
+  void _showBiometricEnableDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Activer la biométrie'),
+        content: const Text(
+          'Souhaitez-vous activer la connexion par empreinte digitale ou reconnaissance faciale pour faciliter vos futures connexions?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _authController.cancelBiometricEnabling();
+            },
+            child: const Text('Plus tard'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _authController.enableBiometricAuthentication();
+            },
+            child: const Text('Activer'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Observer pour afficher la boîte de dialogue de demande d'activation de la biométrie
-    // après la première connexion ou inscription
-    ever(_authController.shouldAskForBiometric, (shouldAsk) {
-      if (shouldAsk) {
-        _showBiometricPrompt(context);
-      }
-    });
-    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Incidents urbains'),
@@ -93,39 +136,5 @@ class HomeScreen extends StatelessWidget {
         child: const Icon(Icons.add),
       ),
     );
-  }
-  
-  // Méthode pour afficher la boîte de dialogue demandant l'activation de la biométrie
-  void _showBiometricPrompt(BuildContext context) {
-    // On utilise Future.delayed pour éviter les problèmes de build context
-    Future.delayed(Duration.zero, () {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Activer l\'authentification biométrique'),
-          content: const Text(
-            'Voulez-vous utiliser votre empreinte digitale ou reconnaissance faciale '
-            'pour vous connecter plus rapidement à l\'avenir?'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _authController.cancelBiometricEnabling();
-              },
-              child: const Text('Non, merci'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _authController.enableBiometricAuthentication();
-              },
-              child: const Text('Activer'),
-            ),
-          ],
-        ),
-      );
-    });
   }
 } 

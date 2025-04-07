@@ -40,21 +40,30 @@ class AuthController extends GetxController {
     isCheckingAuth.value = true;
     
     try {
+      // Vérifier d'abord si la biométrie est disponible et activée
+      final canUseBiometric = await _authService.canUseBiometrics();
+      final biometricEnabled = await _authService.checkBiometricEnabled();
+      
+      // Si la biométrie est disponible et activée, essayer de se connecter automatiquement
+      if (canUseBiometric && biometricEnabled) {
+        developer.log('Biometric login is enabled, attempting automatic authentication');
+        
+        // Demander à l'utilisateur de s'authentifier avec la biométrie
+        final success = await _authService.authenticateWithBiometrics();
+        if (success) {
+          userData.value = await _authRepository.getUserData();
+          Get.offAllNamed('/home');
+          isCheckingAuth.value = false;
+          return;
+        }
+      }
+      
+      // Si la biométrie ne fonctionne pas ou n'est pas configurée, vérifier le token JWT classique
       final isAuth = await _authRepository.isAuthenticated();
       if (isAuth) {
         userData.value = await _authRepository.getUserData();
         Get.offAllNamed('/home');
       } else {
-        // Check for biometric authentication possibility
-        final canUseBiometric = await _authService.canUseBiometrics();
-        if (canUseBiometric) {
-          final success = await _authService.authenticateWithBiometrics();
-          if (success) {
-            userData.value = await _authRepository.getUserData();
-            Get.offAllNamed('/home');
-            return;
-          }
-        }
         if (Get.currentRoute != '/login') {
           Get.offAllNamed('/login');
         }
