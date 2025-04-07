@@ -29,6 +29,17 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   String? _voiceNotePath;
   LatLng? _selectedLocation;
   bool _isLoading = false;
+  String _selectedIncidentType = 'general';
+  
+  // Liste des types d'incidents
+  final List<Map<String, String>> _incidentTypes = [
+    {'value': 'general', 'label': 'General'},
+    {'value': 'fire', 'label': 'Fire'},
+    {'value': 'accident', 'label': 'Accident'},
+    {'value': 'medical', 'label': 'Medical Emergency'},
+    {'value': 'crime', 'label': 'Crime'},
+    {'value': 'other', 'label': 'Other'},
+  ];
 
   @override
   void initState() {
@@ -135,6 +146,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
           voiceNotePath: _voiceNotePath,
           latitude: _selectedLocation!.latitude,
           longitude: _selectedLocation!.longitude,
+          incidentType: _selectedIncidentType,
         );
         
         Get.back();
@@ -210,6 +222,31 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a description';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Incident Type',
+                        border: OutlineInputBorder(),
+                      ),
+                      value: _selectedIncidentType,
+                      items: _incidentTypes.map((type) {
+                        return DropdownMenuItem<String>(
+                          value: type['value'],
+                          child: Text(type['label']!),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedIncidentType = value!;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select an incident type';
                         }
                         return null;
                       },

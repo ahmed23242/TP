@@ -42,7 +42,7 @@ dependencies:
   dio: ^5.4.1
   http: ^1.1.2
   # Authentication
-  local_auth: ^2.1.8
+  local_auth: ^2.3.0
   jwt_decoder: ^2.0.1
   flutter_secure_storage: ^9.0.0
   # Location and maps

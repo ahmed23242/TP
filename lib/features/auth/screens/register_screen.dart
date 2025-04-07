@@ -3,15 +3,12 @@ import 'package:get/get.dart';
 import '../controllers/auth_controller.dart';
 
 class RegisterScreen extends StatelessWidget {
-  final AuthController authController = Get.find<AuthController>();
+  RegisterScreen({super.key});
+
+  final AuthController _authController = Get.find<AuthController>();
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _phoneController = TextEditingController();
-
-  RegisterScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +40,7 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _emailController,
+                  controller: _authController.emailController,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     border: OutlineInputBorder(),
@@ -62,7 +59,7 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _phoneController,
+                  controller: _authController.phoneController,
                   decoration: const InputDecoration(
                     labelText: 'Phone Number',
                     border: OutlineInputBorder(),
@@ -78,7 +75,7 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _passwordController,
+                  controller: _authController.passwordController,
                   decoration: const InputDecoration(
                     labelText: 'Password',
                     border: OutlineInputBorder(),
@@ -108,7 +105,7 @@ class RegisterScreen extends StatelessWidget {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm your password';
                     }
-                    if (value != _passwordController.text) {
+                    if (value != _authController.passwordController.text) {
                       return 'Passwords do not match';
                     }
                     return null;
@@ -116,21 +113,17 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Obx(() => ElevatedButton(
-                  onPressed: authController.isLoading.value
+                  onPressed: _authController.isLoading.value
                       ? null
                       : () {
                           if (_formKey.currentState!.validate()) {
-                            authController.register(
-                              _emailController.text,
-                              _passwordController.text,
-                              _phoneController.text,
-                            );
+                            _authController.register();
                           }
                         },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: authController.isLoading.value
+                  child: _authController.isLoading.value
                       ? const CircularProgressIndicator()
                       : const Text('Register'),
                 )),

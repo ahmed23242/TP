@@ -1,236 +1,133 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/auth_controller.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatelessWidget {
-  final AuthController authController = Get.put(AuthController());
-  final AuthService authService = Get.find<AuthService>();
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-
   LoginScreen({super.key});
+
+  final AuthController _authController = Get.find<AuthController>();
+  final AuthService _authService = Get.find<AuthService>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).primaryColor,
-              Theme.of(context).primaryColor.withOpacity(0.8),
-            ],
-          ),
-        ),
-        child: SafeArea(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
           child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 40),
-                    // Logo and Title
-                    const Icon(
-                      Icons.security,
+                const SizedBox(height: 30),
+                
+                // Logo et titre
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.report_problem_outlined,
                       size: 80,
-                      color: Colors.white,
+                        color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                      Text(
                       'Urban Incidents',
-                      style: TextStyle(
-                        fontSize: 32,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Report and track urban incidents',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white70,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 48),
-                    // Username Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Signaler des incidents urbains',
+                        style: Theme.of(context).textTheme.bodyLarge,
                           ),
                         ],
                       ),
-                      child: TextFormField(
-                        controller: _usernameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(16),
-                          prefixIcon: Icon(Icons.person),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Formulaire
+                Obx(() => _authController.isRegistering.value 
+                  ? _buildRegisterForm() 
+                  : _buildLoginForm()),
+                
+                const SizedBox(height: 20),
+                
+                // Erreur
+                Obx(() => _authController.errorMessage.value.isNotEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Text(
+                        _authController.errorMessage.value,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your username';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Password Field
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: TextFormField(
-                        controller: _passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(16),
-                          prefixIcon: Icon(Icons.lock),
-                        ),
-                        obscureText: true,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Login Button
-                    Obx(() => ElevatedButton(
-                      onPressed: authController.isLoading.value
-                          ? null
-                          : () {
-                              if (_formKey.currentState!.validate()) {
-                                authController.login(
-                                  _usernameController.text,
-                                  _passwordController.text,
-                                );
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Colors.white,
-                        foregroundColor: Theme.of(context).primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 5,
-                      ),
-                      child: authController.isLoading.value
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    )),
-                    const SizedBox(height: 16),
-                    // Biometric Login Button
-                    Obx(() => authService.isBiometricAvailable.value
-                        ? ElevatedButton.icon(
-                            onPressed: authController.isLoading.value
-                                ? null
-                                : () => authController.loginWithBiometrics(),
-                            icon: const Icon(Icons.fingerprint),
-                            label: const Text('Login with Biometrics'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                        textAlign: TextAlign.center,
                             ),
                           )
                         : const SizedBox.shrink()),
-                    const SizedBox(height: 24),
-                    // Register Link
+                
+                // Bouton de connexion/inscription
+                Obx(() => CustomButton(
+                  text: _authController.isRegistering.value ? 'S\'inscrire' : 'Se connecter',
+                  isLoading: _authController.isLoading.value,
+                  onPressed: () => _authController.isRegistering.value 
+                    ? _authController.register() 
+                    : _authController.login(),
+                )),
+                
+                const SizedBox(height: 16),
+                
+                // Bouton de changement connexion/inscription
                     TextButton(
-                      onPressed: () => Get.toNamed('/register'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text(
-                        'Don\'t have an account? Register',
-                        style: TextStyle(
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Demo Users Info
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  onPressed: () => _authController.toggleRegistration(),
+                  child: Text(
+                    _authController.isRegistering.value 
+                      ? 'Déjà un compte ? Se connecter' 
+                      : 'Pas de compte ? S\'inscrire',
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Séparateur
+                Row(
                         children: [
-                          const Text(
-                            'Utilisateurs de démonstration:',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _buildDemoUserInfo(
-                            email: 'user@example.com',
-                            password: 'password123',
-                            role: 'Citoyen',
-                          ),
-                          const SizedBox(height: 4),
-                          _buildDemoUserInfo(
-                            email: 'admin@example.com',
-                            password: 'admin123',
-                            role: 'Administrateur',
-                          ),
-                        ],
-                      ),
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('ou'),
                     ),
+                    Expanded(child: Divider()),
                   ],
                 ),
-              ),
+                
+                const SizedBox(height: 20),
+                
+                // Bouton d'authentification biométrique
+                FutureBuilder<bool>(
+                  future: _authService.canUseBiometrics(),
+                  builder: (context, snapshot) {
+                    final canUseBiometrics = snapshot.data ?? false;
+                    
+                    if (!canUseBiometrics) {
+                      return const SizedBox.shrink();
+                    }
+                    
+                    return CustomButton(
+                      text: 'Se connecter avec la biométrie',
+                      icon: Icons.fingerprint,
+                      isOutlined: true,
+                      onPressed: () => _authController.loginWithBiometrics(),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         ),
@@ -238,33 +135,48 @@ class LoginScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildDemoUserInfo({
-    required String email,
-    required String password,
-    required String role,
-  }) {
-    return Row(
+  Widget _buildLoginForm() {
+    return Column(
       children: [
-        Expanded(
-          flex: 3,
-          child: Text(
-            email,
-            style: const TextStyle(color: Colors.white),
-          ),
+        CustomTextField(
+          label: 'Email',
+          controller: _authController.emailController,
+          keyboardType: TextInputType.emailAddress,
+          prefixIcon: Icons.email,
         ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            password,
-            style: const TextStyle(color: Colors.white),
-          ),
+        const SizedBox(height: 16),
+        CustomTextField(
+          label: 'Mot de passe',
+          controller: _authController.passwordController,
+          isPassword: true,
+          prefixIcon: Icons.lock,
         ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            role,
-            style: const TextStyle(color: Colors.white),
-          ),
+      ],
+    );
+  }
+  
+  Widget _buildRegisterForm() {
+    return Column(
+      children: [
+        CustomTextField(
+          label: 'Email',
+          controller: _authController.emailController,
+          keyboardType: TextInputType.emailAddress,
+          prefixIcon: Icons.email,
+        ),
+        const SizedBox(height: 16),
+        CustomTextField(
+          label: 'Mot de passe',
+          controller: _authController.passwordController,
+          isPassword: true,
+          prefixIcon: Icons.lock,
+        ),
+        const SizedBox(height: 16),
+        CustomTextField(
+          label: 'Téléphone',
+          controller: _authController.phoneController,
+          keyboardType: TextInputType.phone,
+          prefixIcon: Icons.phone,
         ),
       ],
     );

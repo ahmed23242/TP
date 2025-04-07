@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -31,6 +31,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         name TEXT,
+        password TEXT,
+        phone TEXT,
         role TEXT NOT NULL,
         token TEXT,
         last_login TEXT
@@ -73,6 +75,16 @@ class DatabaseHelper {
       } catch (e) {
         print('Error upgrading database: $e');
         // Si erreur (ex: colonne existe déjà), on continue
+      }
+    }
+    
+    if (oldVersion < 3) {
+      // Ajouter les colonnes manquantes à la table users
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN password TEXT;');
+        await db.execute('ALTER TABLE users ADD COLUMN phone TEXT;');
+      } catch (e) {
+        print('Error upgrading users table: $e');
       }
     }
   }

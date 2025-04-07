@@ -56,6 +56,7 @@ class IncidentController extends GetxController {
     String? voiceNotePath,
     required double latitude,
     required double longitude,
+    String incidentType = 'general',
   }) async {
     try {
       isLoading.value = true;
@@ -82,6 +83,7 @@ class IncidentController extends GetxController {
         latitude: latitude,
         longitude: longitude,
         createdAt: DateTime.now(),
+        incidentType: incidentType,
         syncStatus: 'pending',
         userId: userId,
       );

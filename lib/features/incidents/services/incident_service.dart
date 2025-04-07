@@ -266,6 +266,41 @@ class IncidentService extends GetxController {
     }
   }
 
+  // Mettre à jour le statut de synchronisation d'un incident
+  Future<void> updateIncidentSyncStatus(int incidentId, String syncStatus) async {
+    try {
+      await _db.updateIncidentSyncStatus(incidentId, syncStatus);
+      
+      // Update the incident in the list if it exists
+      final index = incidents.indexWhere((inc) => inc.id == incidentId);
+      if (index != -1) {
+        final incident = incidents[index];
+        final updatedIncident = Incident(
+          id: incident.id,
+          title: incident.title,
+          description: incident.description,
+          photoPath: incident.photoPath,
+          photoUrl: incident.photoUrl,
+          voiceNotePath: incident.voiceNotePath,
+          latitude: incident.latitude,
+          longitude: incident.longitude,
+          createdAt: incident.createdAt,
+          status: incident.status,
+          incidentType: incident.incidentType,
+          syncStatus: syncStatus,
+          userId: incident.userId,
+        );
+        incidents[index] = updatedIncident;
+        incidents.refresh();
+      }
+      
+      developer.log('Updated sync status for incident $incidentId to $syncStatus');
+    } catch (e, stackTrace) {
+      developer.log('Error updating incident sync status', error: e, stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
   @override
   void onClose() {
     _recorder.closeRecorder();

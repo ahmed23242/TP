@@ -8,6 +8,7 @@ import 'dart:developer' as developer;
 class AuthRepository {
   final _authService = Get.find<AuthService>();
   final _storage = const FlutterSecureStorage();
+  final _db = DatabaseHelper.instance;
 
   Future<bool> login(String email, String password) async {
     try {
@@ -17,20 +18,60 @@ class AuthRepository {
       return true;
     } catch (e, stackTrace) {
       developer.log('Login failed', error: e, stackTrace: stackTrace);
-      return false;
+      rethrow;
     }
   }
 
   Future<bool> register(String email, String password, String phone) async {
     try {
       developer.log('Attempting registration for email: $email');
-      // For now, we'll just login the user after registration
-      await _authService.loginWithCredentials(email, password);
-      developer.log('Registration successful');
+      
+      // 1. Tenter de se connecter avec l'email fourni pour vérifier s'il existe déjà
+      try {
+        // Cette méthode va lever une exception si l'utilisateur n'existe pas
+        await _authService.loginWithCredentials(email, 'test_password');
+        
+        // Si on arrive ici, c'est que l'utilisateur existe déjà (la connexion a réussi)
+        developer.log('User with email $email already exists (login successful)');
+        throw Exception('Identifiants invalides');
+      } catch (e) {
+        // Si l'erreur est due à des identifiants invalides, c'est normal, l'utilisateur n'existe pas
+        if (!e.toString().contains('Identifiants invalides')) {
+          // Si c'est une autre erreur, on la propage
+          rethrow;
+        }
+        // Sinon, on continue avec l'inscription
+      }
+      
+      // 2. Vérifier si l'email existe déjà dans la base de données locale
+      final existingUser = await _db.getUserByEmail(email);
+      if (existingUser != null) {
+        developer.log('User with email $email already exists in database');
+        throw Exception('Identifiants invalides');
+      }
+      
+      // 3. Créer un nouvel utilisateur dans la base de données locale
+      final newUser = {
+        'id': DateTime.now().millisecondsSinceEpoch, // Générer un ID unique
+        'email': email,
+        'role': 'user', // Rôle par défaut
+        'token': 'auth_token_${DateTime.now().millisecondsSinceEpoch}',
+        'last_login': DateTime.now().toIso8601String(),
+        // Dans une vraie application, nous stockerions un hash du mot de passe
+        // 'password_hash': await _hashPassword(password),
+      };
+      
+      // Simuler un délai d'API
+      await Future.delayed(const Duration(seconds: 1));
+      
+      // Insérer l'utilisateur dans la base de données
+      await _db.insertUser(newUser);
+      developer.log('Registration successful for email: $email');
+      
       return true;
     } catch (e, stackTrace) {
       developer.log('Registration failed', error: e, stackTrace: stackTrace);
-      return false;
+      rethrow;
     }
   }
 

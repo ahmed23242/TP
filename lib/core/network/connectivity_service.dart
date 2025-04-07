@@ -1,58 +1,73 @@
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 import 'dart:developer' as developer;
 
-class ConnectivityService extends GetxService {
+class ConnectivityService extends GetxController {
   final Connectivity _connectivity = Connectivity();
   final RxBool isConnected = false.obs;
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  
+  // Événement auquel les autres services peuvent s'abonner
+  final connectivityChangedEvent = RxBool(false);
 
   @override
   void onInit() {
     super.onInit();
     _initConnectivity();
-    _setupConnectivityListener();
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
   }
 
+  @override
+  void onClose() {
+    _connectivitySubscription.cancel();
+    super.onClose();
+  }
+
+  // Initialiser l'état de connectivité
   Future<void> _initConnectivity() async {
     try {
-      final List<ConnectivityResult> results = await _connectivity.checkConnectivity();
-      _updateConnectionStatus(results);
+      final result = await _connectivity.checkConnectivity();
+      _updateConnectionStatus(result);
     } catch (e) {
-      developer.log('Error checking connectivity', error: e);
+      developer.log('Connectivity initialization error', error: e);
       isConnected.value = false;
     }
   }
 
-  void _setupConnectivityListener() {
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      _updateConnectionStatus(results);
-    });
-  }
-
+  // Mettre à jour l'état de connexion lorsqu'il change
   void _updateConnectionStatus(List<ConnectivityResult> results) {
+    final wasConnected = isConnected.value;
+    
     // Si n'importe quelle connexion est active, considérer comme connecté
-    final bool hasConnection = results.any((result) => 
-      result == ConnectivityResult.wifi || 
+    isConnected.value = results.any((result) => 
       result == ConnectivityResult.mobile || 
+      result == ConnectivityResult.wifi ||
       result == ConnectivityResult.ethernet);
     
-    isConnected.value = hasConnection;
+    developer.log('Connectivity status changed: ${results.map((r) => r.name).join(', ')}, isConnected: ${isConnected.value}');
     
-    if (hasConnection) {
-      developer.log('Connected to the internet: ${results.map((r) => r.name).join(', ')}');
-    } else {
-      developer.log('Not connected to the internet: ${results.map((r) => r.name).join(', ')}');
+    // Si nous passons de déconnecté à connecté, déclencher l'événement
+    if (!wasConnected && isConnected.value) {
+      developer.log('Network reconnected - triggering sync');
+      connectivityChangedEvent.toggle(); // Déclencher l'événement
     }
   }
 
+  // Méthode pour vérifier manuellement la connectivité
   Future<bool> checkConnectivity() async {
     try {
-      final List<ConnectivityResult> results = await _connectivity.checkConnectivity();
-      _updateConnectionStatus(results);
+      final results = await _connectivity.checkConnectivity();
+      
+      // Si n'importe quelle connexion est active, considérer comme connecté
+      isConnected.value = results.any((result) => 
+        result == ConnectivityResult.mobile || 
+        result == ConnectivityResult.wifi ||
+        result == ConnectivityResult.ethernet);
+      
       return isConnected.value;
     } catch (e) {
       developer.log('Error checking connectivity', error: e);
-      isConnected.value = false;
       return false;
     }
   }

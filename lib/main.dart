@@ -14,25 +14,40 @@ import 'features/auth/controllers/auth_controller.dart';
 import 'features/incidents/services/location_service.dart';
 import 'features/incidents/services/audio_service.dart';
 import 'core/network/connectivity_service.dart';
+import 'core/network/api_service.dart';
+import 'core/services/permission_service.dart';
+import 'features/incidents/services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialisation des services
+  // Initialisation des services réseau
+  Get.put(ConnectivityService(), permanent: true);
+  Get.put(ApiService(), permanent: true);
+  
+  // Initialisation des services d'authentification
   final authService = AuthService();
   Get.put(authService, permanent: true);
-  
-  // Enregistrer l'AuthController comme permanent pour qu'il ne soit pas supprimé de la mémoire
   final authController = AuthController();
   Get.put(authController, permanent: true);
   
-  // Autres services
+  // Initialisation des services de gestion des incidents
   Get.put(IncidentService(), permanent: true);
   Get.put(LocationService(), permanent: true);
   Get.put(AudioService());
-  Get.put(ConnectivityService(), permanent: true);
   
+  // Initialisation des services de synchronisation et de permissions
+  Get.put(SyncService(), permanent: true);
+  final permissionService = PermissionService();
+  Get.put(permissionService, permanent: true);
+  
+  // Démarrer l'application
   runApp(const MyApp());
+  
+  // Vérifier les permissions après un court délai pour ne pas bloquer le démarrage
+  Future.delayed(const Duration(seconds: 2), () {
+    permissionService.requestAllPermissions();
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -58,11 +73,8 @@ class MyApp extends StatelessWidget {
       ),
       themeMode: ThemeMode.system,
       initialBinding: BindingsBuilder(() {
-        Get.put(AuthService());
-        Get.put(IncidentService());
-        Get.put(ConnectivityService());
+        // Note: les services principaux sont déjà enregistrés dans main()
         Get.lazyPut(() => IncidentController());
-        Get.put(AuthController(), permanent: true);
       }),
       initialRoute: '/login',
       getPages: [

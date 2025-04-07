@@ -14,9 +14,9 @@ class IncidentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'description', 'incident_type', 'photo', 'photo_url',
             'voice_note', 'voice_note_url', 'latitude', 'longitude', 'status',
-            'created_at', 'updated_at', 'user'
+            'created_at', 'updated_at', 'user', 'sync_status'
         )
-        read_only_fields = ('id', 'created_at', 'updated_at', 'status')
+        read_only_fields = ('id', 'created_at', 'updated_at')
 
     def get_photo_url(self, obj):
         if obj.photo:
@@ -29,5 +29,14 @@ class IncidentSerializer(serializers.ModelSerializer):
         return None
 
     def create(self, validated_data):
+        if 'sync_status' not in validated_data:
+            validated_data['sync_status'] = 'synced'
+        
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'phone_number', 'role')
+        read_only_fields = ('id',)
