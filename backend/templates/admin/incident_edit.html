@@ -1,16 +1,32 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Édition de l'incident #{{ incident.id }}{% endblock %}
+{% block title %}
+{% if is_create %}
+Créer un nouvel incident
+{% else %}
+Édition de l'incident #{{ incident.id }}
+{% endif %}
+{% endblock %}
 
 {% block page_title %}
+{% if is_create %}
+Créer un nouvel incident
+{% else %}
 Édition de l'incident #{{ incident.id }}
+{% endif %}
 {% endblock %}
 
 {% block page_actions %}
 <div class="btn-group">
+    {% if is_create %}
+    <a href="{% url 'admin_incidents_list' %}" class="btn btn-secondary">
+        <i class="fas fa-times"></i> Annuler
+    </a>
+    {% else %}
     <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-secondary">
         <i class="fas fa-times"></i> Annuler
     </a>
+    {% endif %}
     <button type="submit" form="incident-form" class="btn btn-primary">
         <i class="fas fa-save"></i> Enregistrer
     </button>
@@ -25,7 +41,12 @@
                 <h5 class="card-title mb-0">Informations de l'incident</h5>
             </div>
             <div class="card-body">
-                <form id="incident-form" method="post" enctype="multipart/form-data" action="{% url 'admin_incident_edit' incident.id %}">
+                <form id="incident-form" method="post" enctype="multipart/form-data" 
+                    {% if is_create %}
+                    action="{% url 'admin_incident_create' %}"
+                    {% else %}
+                    action="{% url 'admin_incident_edit' incident.id %}"
+                    {% endif %}>
                     {% csrf_token %}
                     
                     {% if form.non_field_errors %}
@@ -251,8 +272,23 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Initialisation de la carte Google Maps
         function initMap() {
-            const latitude = {{ incident.latitude|default:"0" }};
-            const longitude = {{ incident.longitude|default:"0" }};
+            // Utiliser des variables intermédiaires pour éviter les erreurs de linting
+            var defaultLat = 48.8566; // Paris par défaut
+            var defaultLng = 2.3522;  // Paris par défaut
+            
+            // Récupérer les valeurs de l'incident s'il existe
+            {% if incident and incident.latitude %}
+            var latitude = {{ incident.latitude|floatformat:6 }};
+            {% else %}
+            var latitude = defaultLat;
+            {% endif %}
+            
+            {% if incident and incident.longitude %}
+            var longitude = {{ incident.longitude|floatformat:6 }};
+            {% else %}
+            var longitude = defaultLng;
+            {% endif %}
+            
             const location = { lat: latitude, lng: longitude };
             
             const map = new google.maps.Map(document.getElementById("edit-map"), {

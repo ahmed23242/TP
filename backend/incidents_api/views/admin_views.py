@@ -171,10 +171,9 @@ def admin_incident_create(request):
             'sync_status': 'synced',
         })
     
-    return render(request, 'admin/incident_edit.html', {
+    return render(request, 'admin/incident_create.html', {
         'page_title': 'Créer un nouvel incident',
         'form': form,
-        'is_create': True,
         'google_maps_api_key': getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
     })
 

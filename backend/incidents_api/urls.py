@@ -37,4 +37,7 @@ urlpatterns = [
     path('admin-panel/incidents/create/', admin_incident_create, name='admin_incident_create'),
     path('admin-panel/incidents/<int:incident_id>/', admin_incident_detail, name='admin_incident_detail'),
     path('admin-panel/incidents/<int:incident_id>/edit/', admin_incident_edit, name='admin_incident_edit'),
+    
+    # URLs d'authentification Django
+    path('accounts/', include('django.contrib.auth.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
