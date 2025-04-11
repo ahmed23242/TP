@@ -1,0 +1,230 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Tableau de bord - Administration des incidents{% endblock %}
+
+{% block page_title %}
+Tableau de bord
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group">
+    <a href="{% url 'admin_incidents_list' %}" class="btn btn-primary">
+        <i class="fas fa-list"></i> Liste des incidents
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Statistiques générales -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total des incidents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_incidents }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Incidents récents (7 jours) -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Incidents sur 7 jours</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ recent_incidents }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques par statut -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Statuts</div>
+                        {% for stat in status_stats %}
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="text-xs mb-0">{{ stat.status_name }}</div>
+                            </div>
+                            <div class="col">
+                                <div class="progress progress-sm mb-2">
+                                    <div class="progress-bar 
+                                    {% if stat.status == 'pending' %}bg-warning
+                                    {% elif stat.status == 'in_progress' %}bg-info
+                                    {% elif stat.status == 'resolved' %}bg-success
+                                    {% else %}bg-secondary{% endif %}" 
+                                    role="progressbar" style="width: {{ stat.percentage }}%"></div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="text-xs mb-0 font-weight-bold">{{ stat.count }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques par type -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Types d'incidents</div>
+                        {% for stat in type_stats %}
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <div class="text-xs mb-0">{{ stat.type_name }}</div>
+                            </div>
+                            <div class="col">
+                                <div class="progress progress-sm mb-2">
+                                    <div class="progress-bar
+                                    {% if stat.incident_type == 'accident' %}bg-danger
+                                    {% elif stat.incident_type == 'fire' %}bg-warning
+                                    {% elif stat.incident_type == 'medical' %}bg-info
+                                    {% elif stat.incident_type == 'crime' %}bg-dark
+                                    {% else %}bg-secondary{% endif %}" 
+                                    role="progressbar" style="width: {{ stat.percentage }}%"></div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="text-xs mb-0 font-weight-bold">{{ stat.count }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Incidents récents -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Incidents récents</h6>
+                <a href="{% url 'admin_incidents_list' %}" class="btn btn-sm btn-primary">
+                    Voir tous les incidents
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Titre</th>
+                                <th>Type</th>
+                                <th>Statut</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for incident in latest_incidents %}
+                            <tr>
+                                <td>{{ incident.id }}</td>
+                                <td>{{ incident.title }}</td>
+                                <td>
+                                    <span class="badge
+                                    {% if incident.incident_type == 'accident' %}bg-danger
+                                    {% elif incident.incident_type == 'fire' %}bg-warning
+                                    {% elif incident.incident_type == 'medical' %}bg-info
+                                    {% elif incident.incident_type == 'crime' %}bg-dark
+                                    {% else %}bg-secondary{% endif %}">
+                                        {{ incident.get_incident_type_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge
+                                    {% if incident.status == 'pending' %}bg-warning
+                                    {% elif incident.status == 'in_progress' %}bg-info
+                                    {% elif incident.status == 'resolved' %}bg-success
+                                    {% else %}bg-secondary{% endif %}">
+                                        {{ incident.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ incident.created_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <i class="fas fa-info-circle me-2"></i> Aucun incident n'a été enregistré récemment.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Carte des incidents -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Carte des incidents</h6>
+            </div>
+            <div class="card-body">
+                <div id="incidents-map" style="height: 400px; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function initMap() {
+        const map = new google.maps.Map(document.getElementById("incidents-map"), {
+            center: { lat: 48.8566, lng: 2.3522 }, // Paris
+            zoom: 10,
+        });
+        
+        // Ajouter des marqueurs pour chaque incident
+        // Cette partie nécessiterait d'ajouter des données d'incident dans le contexte
+    }
+</script>
+
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=&v=weekly" async></script>
+{% endif %}
+{% endblock %} 

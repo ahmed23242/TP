@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_sound/flutter_sound.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -12,11 +11,12 @@ import '../../../core/network/connectivity_service.dart';
 import 'dart:async';
 import '../../../core/network/api_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'audio_service.dart';
 
 class IncidentService extends GetxController {
   final _db = DatabaseHelper.instance;
   final _imagePicker = ImagePicker();
-  final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  final AudioService _audioService = Get.find<AudioService>();
   late final ConnectivityService _connectivityService;
   
   RxList<Incident> incidents = <Incident>[].obs;
@@ -36,11 +36,6 @@ class IncidentService extends GetxController {
     
     // Set up periodic sync
     _setupPeriodicSync();
-    
-    // Initialisation différée pour éviter de bloquer le thread principal
-    Future.delayed(Duration.zero, () async {
-      await _initRecorder();
-    });
   }
 
   void _setupPeriodicSync() {
@@ -59,15 +54,6 @@ class IncidentService extends GetxController {
     });
   }
 
-  Future<void> _initRecorder() async {
-    try {
-      await _recorder.openRecorder();
-      developer.log('Audio recorder initialized successfully');
-    } catch (e) {
-      developer.log('Error initializing audio recorder', error: e);
-    }
-  }
-  
   // Location handling
   Future<Position> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -104,35 +90,27 @@ class IncidentService extends GetxController {
   // Voice recording
   Future<bool> startVoiceRecording() async {
     try {
-      if (await Permission.microphone.request().isGranted) {
-        final directory = await getApplicationDocumentsDirectory();
-        _currentRecordingPath = path.join(
-          directory.path,
-          'recording_${DateTime.now().millisecondsSinceEpoch}.aac',
-        );
-        
-        await _recorder.startRecorder(
-          toFile: _currentRecordingPath,
-          codec: Codec.aacADTS,
-        );
-        
+      final success = await _audioService.startRecording();
+      if (success) {
         isRecording.value = true;
-        return true;
       }
-      return false;
+      return success;
     } catch (e) {
-      print('Error starting recording: $e');
+      developer.log('Error starting recording', error: e);
       return false;
     }
   }
 
   Future<String?> stopVoiceRecording() async {
     try {
-      await _recorder.stopRecorder();
+      if (!isRecording.value) return null;
+      
+      final path = await _audioService.stopRecording();
       isRecording.value = false;
-      return _currentRecordingPath;
+      _currentRecordingPath = path;
+      return path;
     } catch (e) {
-      print('Error stopping recording: $e');
+      developer.log('Error stopping recording', error: e);
       return null;
     }
   }
@@ -330,7 +308,6 @@ class IncidentService extends GetxController {
 
   @override
   void onClose() {
-    _recorder.closeRecorder();
     super.onClose();
   }
 }

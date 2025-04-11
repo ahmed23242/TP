@@ -119,7 +119,7 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   Future<void> register() async {
     if (emailController.text.isEmpty || 
         passwordController.text.isEmpty || 
@@ -171,7 +171,7 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   void _showBiometricPrompt() {
     if (Get.isDialogOpen ?? false) {
       Get.back();
@@ -232,7 +232,7 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   Future<void> logout() async {
     try {
       await _authService.logout();
@@ -288,7 +288,7 @@ class AuthController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   // Réinitialiser le flag si l'utilisateur refuse d'activer la biométrie
   void cancelBiometricEnabling() {
     shouldAskForBiometric.value = false;

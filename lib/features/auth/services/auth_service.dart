@@ -242,14 +242,14 @@ class AuthService extends GetxController {
         developer.log('Biometric login not enabled for any account');
         return false;
       }
-      
+
       developer.log('Available biometrics: $availableBiometrics');
       
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Veuillez vous authentifier pour accéder à l\'application',
-        options: const AuthenticationOptions(
+          options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: true,
+            biometricOnly: true,
         ),
       );
 
@@ -257,31 +257,34 @@ class AuthService extends GetxController {
         // Récupérer l'ID et l'email associés à la biométrie
         final userIdStr = await _storage.read(key: 'biometric_user_id');
         final email = await _storage.read(key: 'biometric_user_email');
-        final storedToken = await _storage.read(key: 'biometric_token');
         
         if (userIdStr != null && email != null) {
           final userId = int.parse(userIdStr);
           
-          // Si un token était stocké avec la biométrie, l'utiliser pour s'authentifier
-          if (storedToken != null) {
-            await _storage.write(key: 'jwt_token', value: storedToken);
-            developer.log('Restored authentication token from biometric storage');
-          }
-          
-          // Mettre à jour les informations de connexion
-          currentUserId.value = userId;
-          userEmail.value = email;
-          isLoggedIn.value = true;
-          isAuthenticated.value = true;
+          // Restaurer l'ID utilisateur et l'email dans le storage
+          await _storage.write(key: 'user_id', value: userIdStr);
+          await _storage.write(key: 'user_email', value: email);
           
           // Charger les données de l'utilisateur depuis la base de données
           final userData = await _db.getUserByEmail(email);
           if (userData != null) {
+            // Mettre à jour les informations de connexion
+            currentUserId.value = userId;
+            userEmail.value = email;
+            isLoggedIn.value = true;
+            isAuthenticated.value = true;
             userRole.value = userData['role'] as String? ?? 'user';
+            
+            // Créer un nouveau token si nécessaire
+            final token = 'auth_token_${DateTime.now().millisecondsSinceEpoch}';
+            await _storage.write(key: 'jwt_token', value: token);
+            
+            developer.log('Biometric authentication successful for user $email (ID: $userId)');
+            return true;
+          } else {
+            developer.log('Biometric authentication successful but user not found in database');
+            return false;
           }
-          
-          developer.log('Biometric authentication successful for user $email (ID: $userId)');
-          return true;
         } else {
           developer.log('Biometric authentication successful but user data not found');
           return false;
@@ -365,8 +368,12 @@ class AuthService extends GetxController {
   Future<void> logout() async {
     try {
       developer.log('Attempting logout');
+      // Supprimer le token JWT de session mais garder les données biométriques
       await _storage.delete(key: 'jwt_token');
-      await _storage.delete(key: 'user_id');
+      
+      // Ne supprimez pas l'identifiant utilisateur biométrique
+      // await _storage.delete(key: 'user_id');
+      
       isAuthenticated.value = false;
       userRole.value = '';
       currentUserId.value = null;
@@ -489,8 +496,21 @@ class AuthService extends GetxController {
         // Stocker les informations dans le stockage sécurisé
         await _storage.write(key: 'biometric_enabled', value: 'true');
         await _storage.write(key: 'biometric_user_id', value: userId);
+        
         if (userEmail.isNotEmpty) {
           await _storage.write(key: 'biometric_user_email', value: userEmail);
+        }
+        
+        // Obtenir le token actuel et le stocker pour la biométrie
+        final currentToken = await _storage.read(key: 'jwt_token');
+        if (currentToken != null) {
+          await _storage.write(key: 'biometric_token', value: currentToken);
+        }
+        
+        // Récupérer les données utilisateur pour s'assurer qu'elles sont disponibles lors de l'authentification biométrique
+        final userData = await _db.getUserById(int.parse(userId));
+        if (userData != null) {
+          developer.log('Saved user data for biometric authentication: ${userData['email']}');
         }
         
         isBiometricEnabled.value = true;

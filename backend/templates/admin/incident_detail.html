@@ -1,0 +1,295 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Détail de l'incident #{{ incident.id }}{% endblock %}
+
+{% block page_title %}
+Incident #{{ incident.id }} - {{ incident.title }}
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group">
+    <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-primary">
+        <i class="fas fa-edit"></i> Modifier
+    </a>
+    <a href="{% url 'admin_incident_sync' incident.id %}" class="btn btn-outline-secondary">
+        <i class="fas fa-sync"></i> Synchroniser
+    </a>
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+        <i class="fas fa-trash"></i> Supprimer
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne d'informations principales -->
+    <div class="col-md-8">
+        <!-- Informations de base -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Informations de l'incident</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Type d'incident</h6>
+                        <span class="badge 
+                            {% if incident.incident_type == 'accident' %}bg-danger
+                            {% elif incident.incident_type == 'construction' %}bg-warning
+                            {% elif incident.incident_type == 'congestion' %}bg-primary
+                            {% elif incident.incident_type == 'event' %}bg-info
+                            {% elif incident.incident_type == 'hazard' %}bg-secondary
+                            {% else %}bg-dark{% endif %} p-2">
+                            {{ incident.get_incident_type_display }}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Statut</h6>
+                        <span class="badge 
+                            {% if incident.status == 'pending' %}bg-warning
+                            {% elif incident.status == 'in_progress' %}bg-info
+                            {% elif incident.status == 'resolved' %}bg-success
+                            {% else %}bg-secondary{% endif %} p-2">
+                            {{ incident.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Créé par</h6>
+                        <p>{{ incident.user.username }} ({{ incident.user.email }})</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Date de création</h6>
+                        <p>{{ incident.created_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Dernière mise à jour</h6>
+                        <p>{{ incident.updated_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">ID Mobile</h6>
+                        <p>{{ incident.mobile_id|default:"Non disponible" }}</p>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <h6 class="text-muted">Description</h6>
+                        <div class="p-3 bg-light rounded">
+                            {{ incident.description|linebreaks|default:"Aucune description" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Emplacement -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Emplacement</h5>
+            </div>
+            <div class="card-body">
+                <div id="incident-map" style="height: 300px; width: 100%;"></div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Latitude</h6>
+                        <p>{{ incident.latitude }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted">Longitude</h6>
+                        <p>{{ incident.longitude }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Historique de synchronisation -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Historique de synchronisation</h5>
+                <span class="badge 
+                    {% if incident.sync_status == 'pending' %}bg-warning
+                    {% elif incident.sync_status == 'synced' %}bg-success
+                    {% elif incident.sync_status == 'failed' %}bg-danger
+                    {% else %}bg-secondary{% endif %} p-2">
+                    {{ incident.get_sync_status_display }}
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in sync_logs %}
+                            <tr>
+                                <td>{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if log.status == 'success' %}bg-success
+                                        {% elif log.status == 'error' %}bg-danger
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ log.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ log.message }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-3">
+                                    Aucun historique de synchronisation disponible
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Colonne latérale -->
+    <div class="col-md-4">
+        <!-- Photo de l'incident -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Photo</h5>
+            </div>
+            <div class="card-body text-center">
+                {% if incident.photo %}
+                <a href="{{ incident.photo.url }}" target="_blank" class="d-block">
+                    <img src="{{ incident.photo.url }}" alt="Photo de l'incident" class="img-fluid rounded">
+                </a>
+                <a href="{{ incident.photo.url }}" download class="btn btn-sm btn-outline-primary mt-3">
+                    <i class="fas fa-download"></i> Télécharger
+                </a>
+                {% else %}
+                <div class="text-muted py-5">
+                    <i class="fas fa-camera fa-3x mb-3"></i>
+                    <p>Aucune photo disponible</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Enregistrement audio -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Enregistrement audio</h5>
+            </div>
+            <div class="card-body text-center">
+                {% if incident.audio %}
+                <div class="audio-player">
+                    <audio controls class="w-100 mb-3">
+                        <source src="{{ incident.audio.url }}" type="audio/mpeg">
+                        Votre navigateur ne supporte pas l'élément audio.
+                    </audio>
+                </div>
+                <a href="{{ incident.audio.url }}" download class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-download"></i> Télécharger
+                </a>
+                {% else %}
+                <div class="text-muted py-5">
+                    <i class="fas fa-microphone-slash fa-3x mb-3"></i>
+                    <p>Aucun enregistrement audio disponible</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Actions supplémentaires -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="{% url 'admin_incident_edit' incident.id %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-edit me-2"></i> Modifier l'incident
+                    </a>
+                    <a href="{% url 'admin_incident_sync' incident.id %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-sync me-2"></i> Synchroniser
+                    </a>
+                    {% if incident.status != 'resolved' %}
+                    <a href="{% url 'admin_incident_resolve' incident.id %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-check me-2"></i> Marquer comme résolu
+                    </a>
+                    {% endif %}
+                    <button type="button" class="list-group-item list-group-item-action list-group-item-danger" 
+                            data-bs-toggle="modal" data-bs-target="#deleteModal">
+                        <i class="fas fa-trash me-2"></i> Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de suppression -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer l'incident <strong>{{ incident.title }}</strong> ?</p>
+                <p class="text-danger">Cette action est irréversible.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <a href="{% url 'admin_incident_delete' incident.id %}" class="btn btn-danger">Supprimer</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialisation de la carte Google Maps
+        function initMap() {
+            const latitude = {{ incident.latitude }};
+            const longitude = {{ incident.longitude }};
+            const location = { lat: latitude, lng: longitude };
+            
+            const map = new google.maps.Map(document.getElementById("incident-map"), {
+                zoom: 15,
+                center: location,
+            });
+            
+            // Ajouter un marqueur
+            const marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: "{{ incident.title }}",
+            });
+        }
+        
+        // Charger l'API Google Maps
+        if (typeof google === 'object' && typeof google.maps === 'object') {
+            initMap();
+        } else {
+            // Load Google Maps API if not already loaded
+            const script = document.createElement('script');
+            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap";
+            script.async = true;
+            script.defer = true;
+            window.initMap = initMap;
+            document.head.appendChild(script);
+        }
+    });
+</script>
+{% endblock %} 

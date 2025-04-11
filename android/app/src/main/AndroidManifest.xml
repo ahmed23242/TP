@@ -11,6 +11,7 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
+        android:debuggable="true"
         android:largeHeap="true">
         <activity
             android:name=".MainActivity"

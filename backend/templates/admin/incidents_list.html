@@ -1,0 +1,136 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Liste des incidents - Administration des incidents{% endblock %}
+
+{% block page_title %}
+Liste des incidents
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group">
+    <a href="{% url 'admin_incident_create' %}" class="btn btn-success">
+        <i class="fas fa-plus"></i> Nouvel incident
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Filtres -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Filtres</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="type" class="form-label">Type d'incident</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">Tous les types</option>
+                    {% for type_key, type_name in incident_types.items %}
+                    <option value="{{ type_key }}" {% if type_filter == type_key %}selected{% endif %}>{{ type_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="status" class="form-label">Statut</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">Tous les statuts</option>
+                    {% for status_key, status_name in status_choices.items %}
+                    <option value="{{ status_key }}" {% if status_filter == status_key %}selected{% endif %}>{{ status_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="q" class="form-label">Recherche</label>
+                <input type="text" name="q" id="q" class="form-control" value="{{ search_query }}" placeholder="Recherche par titre ou description">
+            </div>
+            <div class="col-12 text-end mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Filtrer
+                </button>
+                <a href="{% url 'admin_incidents_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-sync"></i> Réinitialiser
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Liste des incidents -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+        <h6 class="m-0 font-weight-bold text-primary">Liste des incidents</h6>
+        <span class="badge bg-secondary">{{ incidents.count }} incident(s)</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Titre</th>
+                        <th>Type</th>
+                        <th>Statut</th>
+                        <th>Sync</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for incident in incidents %}
+                    <tr>
+                        <td>{{ incident.id }}</td>
+                        <td>{{ incident.title }}</td>
+                        <td>
+                            <span class="badge
+                            {% if incident.incident_type == 'accident' %}bg-danger
+                            {% elif incident.incident_type == 'fire' %}bg-warning
+                            {% elif incident.incident_type == 'medical' %}bg-info
+                            {% elif incident.incident_type == 'crime' %}bg-dark
+                            {% else %}bg-secondary{% endif %}">
+                                {{ incident.get_incident_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                            {% if incident.status == 'pending' %}bg-warning
+                            {% elif incident.status == 'in_progress' %}bg-info
+                            {% elif incident.status == 'resolved' %}bg-success
+                            {% else %}bg-secondary{% endif %}">
+                                {{ incident.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                            {% if incident.sync_status == 'pending' %}bg-warning
+                            {% elif incident.sync_status == 'synced' %}bg-success
+                            {% elif incident.sync_status == 'failed' %}bg-danger
+                            {% else %}bg-secondary{% endif %}">
+                                {{ incident.get_sync_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ incident.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <i class="fas fa-info-circle me-2"></i> Aucun incident trouvé.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %} 
