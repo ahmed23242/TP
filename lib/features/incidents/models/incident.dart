@@ -63,4 +63,37 @@ class Incident {
       userId: map['user_id'] as int,
     );
   }
+  
+  // Méthode pour créer une copie modifiée de l'objet Incident
+  Incident copyWith({
+    int? id,
+    String? title,
+    String? description,
+    String? photoPath,
+    String? photoUrl,
+    String? voiceNotePath,
+    double? latitude,
+    double? longitude,
+    DateTime? createdAt,
+    String? status,
+    String? incidentType,
+    String? syncStatus,
+    int? userId,
+  }) {
+    return Incident(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      photoPath: photoPath ?? this.photoPath,
+      photoUrl: photoUrl ?? this.photoUrl,
+      voiceNotePath: voiceNotePath ?? this.voiceNotePath,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      incidentType: incidentType ?? this.incidentType,
+      syncStatus: syncStatus ?? this.syncStatus,
+      userId: userId ?? this.userId,
+    );
+  }
 }

@@ -11,8 +11,8 @@ class ApiService extends GetxController {
   // static const String baseUrl = 'http://localhost:8000/api'; // Pour le développement local
   // static const String baseUrl = 'https://votre-api-de-production.com/api'; // Pour la production
   
-  // Adresse IP Wi-Fi de l'ordinateur (d'après la commande ipconfig)
-  static const String baseUrl = 'http://172.20.10.18:8000/api';
+  // URL du serveur déployé sur PythonAnywhere
+  static const String baseUrl = 'https://ahmedabddayme.pythonanywhere.com/api';
   
   final _storage = const FlutterSecureStorage();
   final RxBool isConnected = false.obs;
@@ -33,7 +33,6 @@ class ApiService extends GetxController {
   Future<void> _checkConnection() async {
     try {
       // Utiliser une route qui n'exige pas d'authentification
-      // La route de base de l'API devrait retourner une erreur 404 mais pas une erreur de connexion
       final response = await http.get(Uri.parse('$baseUrl/../health-check/'));
       isConnected.value = true; // Si la requête réussit sans exception
       developer.log('API connection status: ${isConnected.value}');

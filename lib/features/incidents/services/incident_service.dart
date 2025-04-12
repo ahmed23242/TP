@@ -9,6 +9,7 @@ import '../models/incident.dart';
 import 'dart:developer' as developer;
 import '../../../core/network/connectivity_service.dart';
 import 'dart:async';
+import 'dart:math';
 import '../../../core/network/api_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'audio_service.dart';
@@ -179,6 +180,7 @@ class IncidentService extends GetxController {
       final bool isConnected = await _connectivityService.checkConnectivity();
       if (!isConnected) {
         developer.log('No internet connection, sync aborted');
+        isSyncing.value = false;
         return;
       }
       
@@ -188,6 +190,7 @@ class IncidentService extends GetxController {
       
       if (unsyncedIncidents.isEmpty) {
         developer.log('No pending incidents to sync');
+        isSyncing.value = false;
         return;
       }
       
@@ -200,9 +203,13 @@ class IncidentService extends GetxController {
       final token = await const FlutterSecureStorage().read(key: 'jwt_token');
       if (token == null) {
         developer.log('Syncing incidents failed: No authentication token found');
+        isSyncing.value = false;
         return;
       }
-      developer.log('Using token for sync: ${token.substring(0, 10)}...');
+      developer.log('Using token for sync: ${token.substring(0, min(10, token.length))}...');
+      
+      int successCount = 0;
+      int failCount = 0;
       
       // For each pending incident, try to sync with the server
       for (var incidentMap in unsyncedIncidents) {
@@ -219,53 +226,48 @@ class IncidentService extends GetxController {
             'created_at': incident.createdAt.toIso8601String(),
             'user': incident.userId, // Changé de 'user_id' à 'user' pour correspondre au modèle Django
             'status': 'pending',
+            'sync_status': 'pending', // Ajouter sync_status pour correspondre au modèle
           };
           
           developer.log('Preparing to sync incident: ${incident.id}');
           developer.log('With data: $incidentData');
           
-          // Appel direct de l'API pour créer un incident
-          // au lieu d'utiliser la méthode syncIncident
+          // Appel API pour créer un incident
           try {
             final response = await apiService.createIncident(incidentData);
             developer.log('API response for incident ${incident.id}: $response');
             
             // Après synchronisation réussie, mettre à jour le statut dans la DB locale
             await _db.updateIncidentSyncStatus(incident.id, 'synced');
-            developer.log('Synced incident: ${incident.id}');
+            developer.log('Synced incident: ${incident.id} successfully');
+            successCount++;
             
             // Update the incidents list if it contains this incident
             final index = incidents.indexWhere((inc) => inc.id == incident.id);
             if (index != -1) {
-              final updatedIncident = Incident(
-                id: incident.id,
-                title: incident.title,
-                description: incident.description,
-                photoPath: incident.photoPath,
-                photoUrl: incident.photoUrl,
-                voiceNotePath: incident.voiceNotePath,
-                latitude: incident.latitude,
-                longitude: incident.longitude,
-                createdAt: incident.createdAt,
-                status: incident.status,
-                incidentType: incident.incidentType,
-                syncStatus: 'synced',
-                userId: incident.userId,
-              );
+              final updatedIncident = incidents[index].copyWith(syncStatus: 'synced');
               incidents[index] = updatedIncident;
             }
           } catch (apiError) {
-            developer.log('API error syncing incident ${incident.id}', error: apiError);
-            // Ne pas marquer comme synchronisé en cas d'erreur
+            developer.log('API sync error for incident ${incident.id}: $apiError');
+            // Marquer comme échoué après plusieurs tentatives
+            // Pour l'instant, on garde le statut 'pending' pour réessayer plus tard
+            failCount++;
           }
         } catch (e, stackTrace) {
           developer.log('Error processing incident for sync', error: e, stackTrace: stackTrace);
+          failCount++;
         }
       }
       
-      developer.log('Sync process completed');
+      developer.log('Sync completed. Success: $successCount, Failed: $failCount');
+      
+      // Force refresh if any incident was synced successfully
+      if (successCount > 0) {
+        incidents.refresh();
+      }
     } catch (e, stackTrace) {
-      developer.log('Error during sync process', error: e, stackTrace: stackTrace);
+      developer.log('Error during sync', error: e, stackTrace: stackTrace);
     } finally {
       isSyncing.value = false;
     }
