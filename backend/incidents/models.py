@@ -33,8 +33,8 @@ class Incident(models.Model):
     photo_url = models.URLField(blank=True, null=True)  # Pour stocker l'URL après upload
     voice_note_path = models.CharField(max_length=255, blank=True, null=True)  # Chemin local sur le mobile
     voice_note = models.FileField(upload_to='incidents/voice_notes/', null=True, blank=True)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField()  # Pas auto_now_add pour permettre la synchronisation avec timestamp du mobile
     updated_at = models.DateTimeField(auto_now=True)

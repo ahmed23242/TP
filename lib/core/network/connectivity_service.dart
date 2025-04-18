@@ -3,7 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 import 'dart:developer' as developer;
 
-class ConnectivityService extends GetxController {
+class ConnectivityService extends GetxService {
   final Connectivity _connectivity = Connectivity();
   final RxBool isConnected = false.obs;
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
@@ -11,11 +11,19 @@ class ConnectivityService extends GetxController {
   // Événement auquel les autres services peuvent s'abonner
   final connectivityChangedEvent = RxBool(false);
 
+  // Add async initialization
+  Future<ConnectivityService> init() async {
+    developer.log('Initializing ConnectivityService');
+    await _initConnectivity();
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
+    developer.log('ConnectivityService initialized with status: ${isConnected.value}');
+    return this;
+  }
+
   @override
   void onInit() {
     super.onInit();
-    _initConnectivity();
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
+    // We'll initialize in the init() method instead
   }
 
   @override

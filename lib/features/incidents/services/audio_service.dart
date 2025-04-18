@@ -4,13 +4,27 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'dart:developer' as developer;
+import 'package:get/get.dart';
 
-class AudioService {
+class AudioService extends GetxService {
   final _audioRecorder = AudioRecorder();
   final _audioPlayer = AudioPlayer();
   String? _currentRecordingPath;
   bool _isRecording = false;
   bool _isPlaying = false;
+
+  // Implement async initialization
+  Future<AudioService> init() async {
+    developer.log('Initializing AudioService');
+    // Check microphone permission on init
+    final status = await Permission.microphone.status;
+    if (status.isGranted) {
+      developer.log('AudioService: Microphone permission already granted');
+    } else {
+      developer.log('AudioService: Microphone permission not granted. Will request when needed.');
+    }
+    return this;
+  }
 
   Future<bool> startRecording() async {
     try {
@@ -91,8 +105,17 @@ class AudioService {
     }
   }
 
-  void dispose() {
+  @override
+  void onClose() {
     _audioRecorder.dispose();
     _audioPlayer.dispose();
+    super.onClose();
+  }
+  
+  // Add dispose method to be called from widgets
+  void dispose() {
+    // No need to do anything special here since onClose will handle
+    // actual cleanup when the service is disposed by GetX
+    developer.log('AudioService dispose called from widget');
   }
 } 

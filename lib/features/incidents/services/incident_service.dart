@@ -13,11 +13,12 @@ import 'dart:math';
 import '../../../core/network/api_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'audio_service.dart';
+import 'package:flutter/material.dart';
 
 class IncidentService extends GetxController {
   final _db = DatabaseHelper.instance;
   final _imagePicker = ImagePicker();
-  final AudioService _audioService = Get.find<AudioService>();
+  late final AudioService _audioService;
   late final ConnectivityService _connectivityService;
   
   RxList<Incident> incidents = <Incident>[].obs;
@@ -28,15 +29,31 @@ class IncidentService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Initialize connectivity service
-    try {
-      _connectivityService = Get.find<ConnectivityService>();
-    } catch (e) {
-      _connectivityService = Get.put(ConnectivityService());
-    }
+    // Initialize services safely
+    _initializeServices();
     
     // Set up periodic sync
     _setupPeriodicSync();
+  }
+  
+  void _initializeServices() {
+    try {
+      // Try to find existing services
+      _audioService = Get.find<AudioService>();
+      developer.log('AudioService found successfully');
+    } catch (e) {
+      // Create a new instance if not found
+      _audioService = Get.put(AudioService());
+      developer.log('AudioService created anew');
+    }
+    
+    try {
+      _connectivityService = Get.find<ConnectivityService>();
+      developer.log('ConnectivityService found successfully');
+    } catch (e) {
+      _connectivityService = Get.put(ConnectivityService());
+      developer.log('ConnectivityService created anew');
+    }
   }
 
   void _setupPeriodicSync() {
@@ -155,9 +172,57 @@ class IncidentService extends GetxController {
 
   Future<void> syncIncident(Incident incident) async {
     try {
-      // TODO: Implement API call to sync with server
+      developer.log('Starting to sync incident with server: ${incident.id}');
+      
+      // Get the API service
+      final apiService = Get.find<ApiService>();
+      
+      // First check if we have a token
+      final token = await apiService.getStoredToken();
+      if (token == null) {
+        developer.log('Cannot sync incident: No authentication token available');
+        
+        // Show dialog to prompt re-login
+        Get.snackbar(
+          'Authentication Required',
+          'Please log in again to upload your incident reports',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: Duration(seconds: 5),
+          mainButton: TextButton(
+            child: Text('Login'),
+            onPressed: () => Get.offAllNamed('/login'),
+          ),
+        );
+        
+        throw Exception('Not authenticated - token missing');
+      }
+      
+      // Prepare incident data for the API
+      final Map<String, dynamic> incidentData = {
+        'title': incident.title,
+        'description': incident.description,
+        'latitude': incident.latitude,
+        'longitude': incident.longitude,
+        'incident_type': incident.incidentType,
+        'created_at': incident.createdAt.toIso8601String(),
+        'user': incident.userId,
+        'status': 'pending',
+        'sync_status': 'pending',
+        'photo_path': incident.photoPath,
+        'voice_note_path': incident.voiceNotePath,
+      };
+      
+      // Call the API to sync the incident
+      developer.log('Sending incident to server: $incidentData');
+      final response = await apiService.syncIncident(incidentData);
+      
+      if (response != null) {
+        // Update local status to synced
       await _db.updateIncidentSyncStatus(incident.id, 'synced');
-      developer.log('Incident synced: ${incident.id}');
+        developer.log('Incident synced successfully: ${incident.id}');
+      } else {
+        developer.log('Failed to sync incident: ${incident.id}');
+      }
     } catch (e, stackTrace) {
       developer.log('Error syncing incident', error: e, stackTrace: stackTrace);
       rethrow;
@@ -174,10 +239,13 @@ class IncidentService extends GetxController {
     
     try {
       isSyncing.value = true;
-      developer.log('Starting to sync pending incidents');
+      developer.log('-------- STARTING SYNC PROCESS --------');
+      developer.log('Attempting to sync pending incidents to backend');
       
       // Check for internet connectivity
       final bool isConnected = await _connectivityService.checkConnectivity();
+      developer.log('Internet connection status: $isConnected');
+      
       if (!isConnected) {
         developer.log('No internet connection, sync aborted');
         isSyncing.value = false;
@@ -185,6 +253,7 @@ class IncidentService extends GetxController {
       }
       
       // Get unsynced incidents
+      developer.log('Fetching unsynced incidents from local database');
       final List<Map<String, dynamic>> unsyncedIncidents = 
           await _db.getUnsyncedIncidents();
       
@@ -196,27 +265,32 @@ class IncidentService extends GetxController {
       
       developer.log('Found ${unsyncedIncidents.length} incidents to sync');
       
-      // Obtenir le service API pour envoyer les données
+      // Get API service for sending data
+      developer.log('Getting API service for syncing');
       final apiService = Get.find<ApiService>();
       
-      // Vérifier le token avant de commencer
+      // Check for authentication token
+      developer.log('Checking for authentication token');
       final token = await const FlutterSecureStorage().read(key: 'jwt_token');
       if (token == null) {
         developer.log('Syncing incidents failed: No authentication token found');
         isSyncing.value = false;
         return;
       }
-      developer.log('Using token for sync: ${token.substring(0, min(10, token.length))}...');
+      developer.log('Authentication token found, continuing with sync');
       
       int successCount = 0;
       int failCount = 0;
       
-      // For each pending incident, try to sync with the server
+      // Process each unsynced incident
       for (var incidentMap in unsyncedIncidents) {
         try {
           final incident = Incident.fromMap(incidentMap);
           
-          // Préparer les données pour l'API en format complet
+          developer.log('Processing incident ID: ${incident.id} for sync');
+          developer.log('Incident details: title=${incident.title}, type=${incident.incidentType}, userId=${incident.userId}');
+          
+          // Prepare data for API in proper format
           final Map<String, dynamic> incidentData = {
             'title': incident.title,
             'description': incident.description,
@@ -224,50 +298,52 @@ class IncidentService extends GetxController {
             'longitude': incident.longitude,
             'incident_type': incident.incidentType,
             'created_at': incident.createdAt.toIso8601String(),
-            'user': incident.userId, // Changé de 'user_id' à 'user' pour correspondre au modèle Django
+            'photo_path': incident.photoPath,
+            'voice_note_path': incident.voiceNotePath,
             'status': 'pending',
-            'sync_status': 'pending', // Ajouter sync_status pour correspondre au modèle
+            'sync_status': 'pending',
+            'user': incident.userId, // Make sure to include the user ID
           };
           
-          developer.log('Preparing to sync incident: ${incident.id}');
-          developer.log('With data: $incidentData');
+          developer.log('Syncing incident ${incident.id} to backend');
           
-          // Appel API pour créer un incident
-          try {
-            final response = await apiService.createIncident(incidentData);
-            developer.log('API response for incident ${incident.id}: $response');
-            
-            // Après synchronisation réussie, mettre à jour le statut dans la DB locale
+          // Call API to sync incident
+          final response = await apiService.syncIncident(incidentData);
+          
+          if (response != null) {
+            // Update local status to synced
+            developer.log('Successfully synced incident ${incident.id} to backend, updating local status');
             await _db.updateIncidentSyncStatus(incident.id, 'synced');
-            developer.log('Synced incident: ${incident.id} successfully');
+            developer.log('Incident ${incident.id} successfully synced');
             successCount++;
-            
-            // Update the incidents list if it contains this incident
-            final index = incidents.indexWhere((inc) => inc.id == incident.id);
-            if (index != -1) {
-              final updatedIncident = incidents[index].copyWith(syncStatus: 'synced');
-              incidents[index] = updatedIncident;
-            }
-          } catch (apiError) {
-            developer.log('API sync error for incident ${incident.id}: $apiError');
-            // Marquer comme échoué après plusieurs tentatives
-            // Pour l'instant, on garde le statut 'pending' pour réessayer plus tard
+          } else {
+            developer.log('Failed to sync incident ${incident.id}: null response from API');
             failCount++;
           }
-        } catch (e, stackTrace) {
-          developer.log('Error processing incident for sync', error: e, stackTrace: stackTrace);
+        } catch (e) {
+          developer.log('Error syncing incident: $e');
           failCount++;
         }
       }
       
-      developer.log('Sync completed. Success: $successCount, Failed: $failCount');
+      developer.log('Sync completed - Success: $successCount, Failed: $failCount');
       
-      // Force refresh if any incident was synced successfully
+      // Update the incidents list if any were successfully synced
       if (successCount > 0) {
-        incidents.refresh();
+        // Reload incidents to reflect new sync status
+        developer.log('Reloading incidents list after successful sync');
+        final currentUserId = await const FlutterSecureStorage().read(key: 'user_id');
+        if (currentUserId != null) {
+          developer.log('Reloading incidents for user ID: $currentUserId');
+          await getUserIncidents(int.parse(currentUserId));
+        } else {
+          developer.log('Cannot reload incidents: user ID not found');
+        }
       }
+      
+      developer.log('-------- SYNC PROCESS COMPLETED --------');
     } catch (e, stackTrace) {
-      developer.log('Error during sync', error: e, stackTrace: stackTrace);
+      developer.log('Error during sync process', error: e, stackTrace: stackTrace);
     } finally {
       isSyncing.value = false;
     }

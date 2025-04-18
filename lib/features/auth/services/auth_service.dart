@@ -7,8 +7,10 @@ import 'dart:developer' as developer;
 import '../../../core/database/database_helper.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:local_auth/error_codes.dart' as auth_error;
 import '../controllers/auth_controller.dart';
+import '../../../core/network/api_service.dart';
 
 class AuthService extends GetxController {
   final LocalAuthentication _localAuth = LocalAuthentication();
@@ -22,6 +24,21 @@ class AuthService extends GetxController {
   final RxString userEmail = ''.obs;
   final RxBool isLoggedIn = false.obs;
   final Rx<int?> currentUserId = Rx<int?>(null);
+
+  // API Service
+  final ApiService apiService;
+
+  // Constructor with required dependency
+  AuthService({required this.apiService});
+
+  // Add async initialization pattern
+  Future<AuthService> init() async {
+    developer.log('Initializing AuthService');
+    await _initializeAuth();
+    await checkLoginStatus();
+    developer.log('AuthService initialized successfully');
+    return this;
+  }
 
   // Liste d'utilisateurs valides pour démonstration
   final List<Map<String, dynamic>> _validUsers = [
@@ -120,29 +137,215 @@ class AuthService extends GetxController {
 
   Future<bool> login(String email, String password) async {
     try {
+      developer.log('-------- STARTING LOGIN PROCESS --------');
+      developer.log('Attempting login for user: $email');
+      
+      // Track if we authenticated locally
+      bool localAuthSuccess = false;
+      
+      // Try local login first for offline support
+      developer.log('Checking local database first');
       final user = await _db.getUserByEmail(email);
       if (user != null && user['password'] == password) {
+        developer.log('Local password verification successful for: ${user['email']}');
+        
+        // Store basic user info for offline use
         await _storage.write(key: 'user_id', value: user['id'].toString());
         await _storage.write(key: 'user_email', value: email);
         userEmail.value = email;
         currentUserId.value = user['id'];
         isLoggedIn.value = true;
+        
+        // Mark that we succeeded locally
+        localAuthSuccess = true;
+        developer.log('Local login successful for user ID: ${user['id']}');
+      } else if (user != null) {
+        developer.log('Local password verification failed');
+      } else {
+        developer.log('User not found in local database');
+      }
+      
+      // Always attempt API login when possible to ensure we have a valid token
+      try {
+        developer.log('Getting API service for login');
+        final apiService = Get.find<ApiService>();
+        
+        developer.log('Attempting API login to backend');
+        // Call the API service's login method
+        final loginResult = await apiService.login(email, password);
+        
+        if (loginResult != null) {
+          developer.log('API login successful with data: $loginResult');
+          
+          // Save authentication tokens
+          if (loginResult['access'] != null) {
+            final token = loginResult['access'];
+            await _storage.write(key: 'jwt_token', value: token);
+            developer.log('Access token saved to secure storage: ${token.substring(0, math.min<int>(10, token.length))}...');
+            
+            // Verify token was stored
+            final storedToken = await _storage.read(key: 'jwt_token');
+            if (storedToken != null) {
+              developer.log('Token successfully stored in secure storage');
+            } else {
+              developer.log('ERROR: Token was not properly stored!');
+            }
+          } else {
+            developer.log('WARNING: No access token found in login response!');
+          }
+          
+          if (loginResult['refresh'] != null) {
+            await _storage.write(key: 'refresh_token', value: loginResult['refresh']);
+            developer.log('Refresh token saved to secure storage');
+          }
+          
+          // Get the user profile to ensure we have current data
+          developer.log('Fetching user profile from backend');
+          final userData = await apiService.getUserProfile();
+          
+          if (userData != null) {
+            developer.log('User profile fetched: $userData');
+            
+            // Store user ID from API
+            final userId = userData['id'].toString();
+            await _storage.write(key: 'user_id', value: userId);
+            await _storage.write(key: 'user_email', value: email);
+            userEmail.value = email;
+            currentUserId.value = int.parse(userId);
+            isLoggedIn.value = true;
+            
+            developer.log('User data saved to secure storage, userId: $userId');
+            
+            // Update local database if needed
+            final existingUser = await _db.getUserByEmail(email);
+            if (existingUser == null) {
+              // User doesn't exist locally, create entry
+              developer.log('Creating local database entry for user');
+              await _db.insertUser({
+                'id': int.parse(userId),
+                'email': email,
+                'password': password, // Note: storing password plaintext is not secure
+                'role': userData['role'] ?? 'user',
+                'token': await _storage.read(key: 'jwt_token') ?? '',
+                'last_login': DateTime.now().toIso8601String(),
+              });
+              developer.log('User saved to local database');
+            } else {
+              developer.log('User already exists in local database');
+            }
+            
+            developer.log('Login successful');
+            developer.log('-------- LOGIN PROCESS COMPLETED --------');
+            return true;
+          } else {
+            developer.log('Failed to fetch user profile after login');
+          }
+        } else {
+          developer.log('API login returned null result');
+        }
+      } catch (apiError) {
+        developer.log('API login failed: $apiError');
+        // If we already authenticated locally, we can still return success
+        if (localAuthSuccess) {
+          developer.log('Using local authentication as fallback');
+          developer.log('-------- LOGIN PROCESS COMPLETED WITH LOCAL AUTH ONLY --------');
+          // Generate a temporary local token for offline use
+          final tempToken = 'local_auth_token_${DateTime.now().millisecondsSinceEpoch}';
+          await _storage.write(key: 'jwt_token', value: tempToken);
+          developer.log('Temporary local token stored for offline use');
+          return true;
+        }
+      }
+      
+      // Return based on local auth if API failed but local succeeded
+      if (localAuthSuccess) {
         return true;
       }
+      
+      developer.log('Login failed: invalid credentials or user not found');
+      developer.log('-------- LOGIN PROCESS COMPLETED --------');
       return false;
     } catch (e) {
       developer.log('Error during login', error: e);
+      developer.log('-------- LOGIN PROCESS COMPLETED WITH ERROR --------');
       return false;
     }
   }
 
   Future<bool> register(String email, String password, String phone) async {
     try {
+      developer.log('-------- STARTING REGISTRATION PROCESS --------');
+      developer.log('Attempting to register user: $email');
+      
+      // First, check if we can register with the API
+      developer.log('Getting API service for registration');
+      final apiService = Get.find<ApiService>();
+      
+      try {
+        // Call the API registration endpoint
+        developer.log('Attempting to register user via backend API');
+        final response = await apiService.register(email, password, phone);
+        
+        if (response != null) {
+          developer.log('User registered successfully via API with response: $response');
+          
+          // Save the tokens
+          if (response['access'] != null) {
+            await _storage.write(key: 'jwt_token', value: response['access']);
+            developer.log('Access token saved to secure storage');
+          } else {
+            developer.log('Warning: No access token in registration response');
+          }
+          
+          if (response['refresh'] != null) {
+            await _storage.write(key: 'refresh_token', value: response['refresh']);
+            developer.log('Refresh token saved to secure storage');
+          }
+          
+          // Save user info
+          if (response['user'] != null) {
+            developer.log('Saving user data from registration response: ${response['user']}');
+            final userId = response['user']['id'].toString();
+            await _storage.write(key: 'user_id', value: userId);
+            await _storage.write(key: 'user_email', value: email);
+            currentUserId.value = int.parse(userId);
+            isLoggedIn.value = true;
+            
+            // Also save to local database as backup
+            developer.log('Saving user to local database');
+            await _db.insertUser({
+              'id': int.parse(userId),
+              'email': email,
+              'password': password,
+              'phone': phone,
+              'role': 'user',
+              'token': response['access'],
+              'last_login': DateTime.now().toIso8601String(),
+            });
+            
+            developer.log('Registration completed successfully');
+            developer.log('-------- REGISTRATION PROCESS COMPLETED --------');
+            return true;
+          } else {
+            developer.log('Warning: No user data in registration response');
+          }
+        } else {
+          developer.log('API registration returned null response');
+        }
+      } catch (apiError) {
+        developer.log('API registration failed, falling back to local', error: apiError);
+      }
+      
+      // API failed or unavailable, fall back to local registration
+      developer.log('Checking if user exists in local database');
       final existingUser = await _db.getUserByEmail(email);
       if (existingUser != null) {
+        developer.log('User already exists locally with email: $email');
+        developer.log('-------- REGISTRATION PROCESS FAILED --------');
         return false; // User already exists
       }
 
+      developer.log('Creating new user in local database');
       final userId = await _db.insertUser({
         'email': email,
         'password': password,
@@ -153,14 +356,21 @@ class AuthService extends GetxController {
       });
 
       if (userId > 0) {
+        developer.log('User created in local database with ID: $userId');
         await _storage.write(key: 'user_id', value: userId.toString());
         currentUserId.value = userId;
         isLoggedIn.value = true;
+        developer.log('User registered locally with ID: $userId');
+        developer.log('-------- REGISTRATION PROCESS COMPLETED --------');
         return true;
       }
+      
+      developer.log('Failed to create user in local database');
+      developer.log('-------- REGISTRATION PROCESS FAILED --------');
       return false;
     } catch (e) {
       developer.log('Error during registration', error: e);
+      developer.log('-------- REGISTRATION PROCESS COMPLETED WITH ERROR --------');
       return false;
     }
   }

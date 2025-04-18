@@ -2,15 +2,23 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:get/get.dart';
 import 'dart:developer' as developer;
 
-class PermissionService extends GetxController {
+class PermissionService extends GetxService {
   final RxBool locationPermissionGranted = false.obs;
   final RxBool cameraPermissionGranted = false.obs;
   final RxBool microphonePermissionGranted = false.obs;
 
+  // Add async initialization pattern
+  Future<PermissionService> init() async {
+    developer.log('Initializing PermissionService');
+    await _checkInitialPermissions();
+    developer.log('PermissionService initialized successfully');
+    return this;
+  }
+
   @override
   void onInit() {
     super.onInit();
-    _checkInitialPermissions();
+    // Initialization moved to init() method
   }
 
   Future<void> _checkInitialPermissions() async {
@@ -67,32 +75,17 @@ class PermissionService extends GetxController {
     }
   }
 
-  Future<bool> requestAllPermissions() async {
-    try {
-      developer.log('Requesting all required permissions...');
-      
-      final locationStatus = await Permission.location.request();
-      final cameraStatus = await Permission.camera.request();
-      final microphoneStatus = await Permission.microphone.request();
-      
-      locationPermissionGranted.value = locationStatus.isGranted;
-      cameraPermissionGranted.value = cameraStatus.isGranted;
-      microphonePermissionGranted.value = microphoneStatus.isGranted;
-      
-      final allGranted = locationPermissionGranted.value && 
-                         cameraPermissionGranted.value && 
-                         microphonePermissionGranted.value;
-      
-      developer.log('All permissions requested - '
-          'Location: ${locationPermissionGranted.value}, '
-          'Camera: ${cameraPermissionGranted.value}, '
-          'Microphone: ${microphonePermissionGranted.value}');
-      
-      return allGranted;
-    } catch (e) {
-      developer.log('Error requesting all permissions', error: e);
-      return false;
-    }
+  Future<void> requestAllPermissions() async {
+    developer.log('Requesting all required permissions...');
+    
+    final locationGranted = await requestLocationPermission();
+    final cameraGranted = await requestCameraPermission();
+    final microphoneGranted = await requestMicrophonePermission();
+    
+    developer.log('All permissions requested - '
+        'Location: $locationGranted, '
+        'Camera: $cameraGranted, '
+        'Microphone: $microphoneGranted');
   }
   
   // Ouvrir les paramètres de l'application pour que l'utilisateur puisse gérer manuellement les autorisations

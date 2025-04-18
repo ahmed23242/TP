@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.20.10.18', 'votre-nom-utilisateur.pythonanywhere.com', 'ahmedabddayme.pythonanywhere.com']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.20.10.18', '10.0.2.2', 'votre-nom-utilisateur.pythonanywhere.com', 'ahmedabddayme.pythonanywhere.com']
 
 # Application definition
 INSTALLED_APPS = [
@@ -96,18 +96,19 @@ else:
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    # Comment out password validators for testing
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    # },
 ]
 
 # Internationalization

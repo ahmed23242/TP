@@ -4,6 +4,9 @@ import 'package:accidentsapp/features/incidents/services/incident_service.dart';
 import 'package:accidentsapp/features/auth/controllers/auth_controller.dart';
 import 'package:get/get.dart';
 import 'dart:developer' as developer;
+import '../../../core/network/api_service.dart';
+import '../services/sync_service.dart';
+import 'package:flutter/material.dart';
 
 class IncidentController extends GetxController {
   final IncidentService _incidentService = Get.find<IncidentService>();
@@ -125,6 +128,22 @@ class IncidentController extends GetxController {
   Future<void> syncIncidents() async {
     try {
       isLoading.value = true;
+      
+      // Check for authentication token first
+      final apiService = Get.find<ApiService>();
+      final token = await apiService.getStoredToken();
+      
+      if (token == null) {
+        developer.log('Cannot sync incidents: No authentication token found');
+        Get.snackbar(
+          'Authentication Required',
+          'Please log in again to sync your incidents',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: Duration(seconds: 5),
+        );
+        return;
+      }
+      
       final unsyncedIncidents = await _incidentService.getUnsyncedIncidents();
       developer.log('Found ${unsyncedIncidents.length} unsynced incidents');
 
@@ -142,11 +161,93 @@ class IncidentController extends GetxController {
       developer.log('Error syncing incidents', error: e, stackTrace: stackTrace);
       Get.snackbar(
         'Error',
-        'Failed to sync incidents',
+        'Failed to sync incidents: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // Add a method to manually trigger syncing with detailed logs
+  Future<void> manualSyncIncidents() async {
+    try {
+      developer.log('-------- MANUAL SYNC TRIGGERED --------');
+      isLoading.value = true;
+      
+      developer.log('Getting API service to check token');
+      final apiService = Get.find<ApiService>();
+      
+      // Check token validity first
+      developer.log('Checking authentication token validity');
+      final validToken = await apiService.ensureValidToken();
+      
+      if (!validToken) {
+        developer.log('No valid token available, prompting for login');
+        isLoading.value = false;
+        promptReLogin();
+        return;
+      }
+      
+      developer.log('Token is valid, proceeding with sync');
+      
+      // Check API endpoints
+      developer.log('Checking API endpoints before sync');
+      await apiService.checkApiEndpoints();
+      
+      developer.log('Getting SyncService for manual sync');
+      final syncService = Get.find<SyncService>();
+      
+      // Perform the sync
+      developer.log('Triggering manual sync process');
+      await syncService.manualSync();
+      
+      developer.log('Manual sync completed, refreshing incident list');
+      await loadIncidents();
+      
+      // Show success message
+      Get.snackbar(
+        'Sync Complete',
+        'Incidents have been synced with the server',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: Duration(seconds: 3),
+      );
+      
+      developer.log('-------- MANUAL SYNC COMPLETED --------');
+    } catch (e, stackTrace) {
+      developer.log('Error during manual sync', error: e, stackTrace: stackTrace);
+      Get.snackbar(
+        'Sync Failed',
+        'Could not sync incidents: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: Duration(seconds: 5),
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Add a method to handle missing tokens by triggering a re-login
+  void promptReLogin() {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Authentication Required'),
+        content: Text('Please log in again to upload your incident reports.'),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Get.back(),
+          ),
+          ElevatedButton(
+            child: Text('Login Now'),
+            onPressed: () {
+              Get.back();
+              Get.offAllNamed('/login');
+            },
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 }

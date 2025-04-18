@@ -1,13 +1,35 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:developer' as developer;
+import 'package:get/get.dart';
 
-class LocationService {
+class LocationService extends GetxService {
+  // Add observable state
+  final RxBool locationPermissionGranted = false.obs;
+  
+  // Implement async initialization
+  Future<LocationService> init() async {
+    developer.log('Initializing LocationService');
+    // Check location permission on init
+    final permissionStatus = await Permission.location.status;
+    locationPermissionGranted.value = permissionStatus.isGranted;
+    
+    if (locationPermissionGranted.value) {
+      developer.log('LocationService: Location permission already granted');
+    } else {
+      developer.log('LocationService: Location permission not granted. Will request when needed.');
+    }
+    
+    return this;
+  }
+
   Future<Position?> getCurrentLocation() async {
     try {
       // Check location permission
       final status = await Permission.location.request();
-      if (status != PermissionStatus.granted) {
+      locationPermissionGranted.value = status.isGranted;
+      
+      if (!locationPermissionGranted.value) {
         developer.log('Location permission denied');
         return null;
       }
@@ -35,8 +57,9 @@ class LocationService {
   Future<bool> requestLocationPermission() async {
     try {
       final status = await Permission.location.request();
+      locationPermissionGranted.value = status.isGranted;
       developer.log('Location permission status: $status');
-      return status == PermissionStatus.granted;
+      return locationPermissionGranted.value;
     } catch (e, stackTrace) {
       developer.log('Error requesting location permission', error: e, stackTrace: stackTrace);
       return false;

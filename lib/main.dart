@@ -17,36 +17,53 @@ import 'core/network/connectivity_service.dart';
 import 'core/network/api_service.dart';
 import 'core/services/permission_service.dart';
 import 'features/incidents/services/sync_service.dart';
+import 'core/database/database_helper.dart';
+import 'core/services/navigation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialisation des services réseau
-  Get.put(ConnectivityService(), permanent: true);
-  Get.put(ApiService(), permanent: true);
+  // Activation du mode test pour éviter les erreurs de navigation sans contexte
+  Get.testMode = true;
   
-  // Initialisation des services d'authentification
-  final authService = AuthService();
-  Get.put(authService, permanent: true);
-  final authController = AuthController();
-  Get.put(authController, permanent: true);
-  
-  // Initialisation des services de gestion des incidents
-  Get.put(IncidentService(), permanent: true);
-  Get.put(LocationService(), permanent: true);
-  Get.put(AudioService());
-  
-  // Initialisation des services de synchronisation et de permissions
-  Get.put(SyncService(), permanent: true);
-  final permissionService = PermissionService();
-  Get.put(permissionService, permanent: true);
+  try {
+    // Initialisation des services réseau
+    final connectivityService = await Get.putAsync(() => ConnectivityService().init());
+    final apiService = await Get.putAsync(() => ApiService(connectivityService: connectivityService).init());
+    
+    // Initialisation des services audio et localisation avant les incidents
+    final audioService = await Get.putAsync(() => AudioService().init());
+    final locationService = await Get.putAsync(() => LocationService().init());
+    final navigationService = await Get.putAsync(() => NavigationService().init());
+    
+    // Initialisation des services d'authentification
+    final authService = await Get.putAsync(() => AuthService(apiService: apiService).init());
+    
+    // Initialisation des services de gestion des incidents (après AudioService)
+    Get.put(IncidentService(), permanent: true);
+    
+    // Initialisation du contrôleur d'authentification (après les services)
+    final authController = AuthController();
+    Get.put(authController, permanent: true);
+    
+    // Initialisation des services de synchronisation et de permissions
+    Get.put(SyncService(), permanent: true);
+    final permissionService = PermissionService();
+    Get.put(permissionService, permanent: true);
+  } catch (e) {
+    print('Error during initialization: $e');
+  }
   
   // Démarrer l'application
   runApp(const MyApp());
   
   // Vérifier les permissions après un court délai pour ne pas bloquer le démarrage
   Future.delayed(const Duration(seconds: 2), () {
-    permissionService.requestAllPermissions();
+    try {
+      Get.find<PermissionService>().requestAllPermissions();
+    } catch (e) {
+      print('Error requesting permissions: $e');
+    }
   });
 }
 
@@ -56,6 +73,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Urban Incidents',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

@@ -7,10 +7,10 @@ class AudioRecorderWidget extends StatefulWidget {
   final String? initialRecordingPath;
 
   const AudioRecorderWidget({
-    Key? key,
+    super.key,
     required this.onRecordingComplete,
     this.initialRecordingPath,
-  }) : super(key: key);
+  });
 
   @override
   State<AudioRecorderWidget> createState() => _AudioRecorderWidgetState();

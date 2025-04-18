@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:developer' as developer;
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -90,72 +91,151 @@ class DatabaseHelper {
   }
 
   Future<int> insertUser(Map<String, dynamic> user) async {
-    final db = await database;
-    return await db.insert(
-      'users',
-      user,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      developer.log('DB: Inserting or updating user: ${user['email']}');
+      final db = await database;
+      
+      // Check if user already exists
+      final existingUser = await getUserByEmail(user['email']);
+      
+      if (existingUser != null) {
+        // Update existing user
+        developer.log('DB: User exists, updating: ${user['email']}');
+        await db.update(
+          'users',
+          user,
+          where: 'email = ?',
+          whereArgs: [user['email']],
+        );
+        developer.log('DB: User updated: ${existingUser['id']}');
+        return existingUser['id'];
+      } else {
+        // Insert new user
+        developer.log('DB: Inserting new user: ${user['email']}');
+        final id = await db.insert('users', user);
+        developer.log('DB: New user inserted with ID: $id');
+        return id;
+      }
+    } catch (e) {
+      developer.log('DB: Error inserting user', error: e);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> getUserByEmail(String email) async {
-    final db = await database;
-    final results = await db.query(
-      'users',
-      where: 'email = ?',
-      whereArgs: [email],
-      limit: 1,
-    );
-    return results.isNotEmpty ? results.first : null;
+    try {
+      developer.log('DB: Looking up user by email: $email');
+      final db = await database;
+      final results = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: [email],
+      );
+      
+      if (results.isNotEmpty) {
+        developer.log('DB: User found: ${results.first}');
+        return results.first;
+      } else {
+        developer.log('DB: No user found with email: $email');
+        return null;
+      }
+    } catch (e) {
+      developer.log('DB: Error getting user by email', error: e);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> getUserById(int id) async {
-    final db = await database;
-    final results = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    return results.isNotEmpty ? results.first : null;
+    try {
+      developer.log('DB: Looking up user by ID: $id');
+      final db = await database;
+      final results = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      
+      if (results.isNotEmpty) {
+        developer.log('DB: User found by ID: ${results.first['email']}');
+        return results.first;
+      } else {
+        developer.log('DB: No user found with ID: $id');
+        return null;
+      }
+    } catch (e) {
+      developer.log('DB: Error getting user by ID', error: e);
+      rethrow;
+    }
   }
 
   Future<int> insertIncident(Map<String, dynamic> incident) async {
-    final db = await database;
-    return await db.insert(
-      'incidents',
-      incident,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      developer.log('DB: Inserting incident into local database: ${incident['title']}');
+      final db = await database;
+      final id = await db.insert('incidents', incident);
+      developer.log('DB: Incident inserted with ID: $id');
+      return id;
+    } catch (e) {
+      developer.log('DB: Error inserting incident', error: e);
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getIncidentsByUserId(int userId) async {
-    final db = await database;
-    return await db.query(
-      'incidents',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-      orderBy: 'created_at DESC',
-    );
+    try {
+      developer.log('DB: Fetching incidents for user ID: $userId');
+      final db = await database;
+      final incidents = await db.query(
+        'incidents',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+        orderBy: 'created_at DESC',
+      );
+      developer.log('DB: Found ${incidents.length} incidents for user $userId');
+      return incidents;
+    } catch (e) {
+      developer.log('DB: Error getting incidents by user ID', error: e);
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> getUnsyncedIncidents() async {
-    final db = await database;
-    return await db.query(
-      'incidents',
-      where: 'sync_status = ?',
-      whereArgs: ['pending'],
-    );
+    try {
+      developer.log('DB: Fetching unsynced incidents from database');
+      final db = await database;
+      final incidents = await db.query(
+        'incidents',
+        where: 'sync_status = ?',
+        whereArgs: ['pending'],
+        orderBy: 'created_at ASC',
+      );
+      developer.log('DB: Found ${incidents.length} unsynced incidents');
+      if (incidents.isNotEmpty) {
+        developer.log('DB: First unsynced incident: ${incidents.first}');
+      }
+      return incidents;
+    } catch (e) {
+      developer.log('DB: Error getting unsynced incidents', error: e);
+      rethrow;
+    }
   }
 
-  Future<void> updateIncidentSyncStatus(int id, String status) async {
-    final db = await database;
-    await db.update(
-      'incidents',
-      {'sync_status': status},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<int> updateIncidentSyncStatus(int incidentId, String syncStatus) async {
+    try {
+      developer.log('DB: Updating sync status for incident $incidentId to $syncStatus');
+      final db = await database;
+      final count = await db.update(
+        'incidents',
+        {'sync_status': syncStatus},
+        where: 'id = ?',
+        whereArgs: [incidentId],
+      );
+      developer.log('DB: Updated sync status for $count incidents');
+      return count;
+    } catch (e) {
+      developer.log('DB: Error updating incident sync status', error: e);
+      rethrow;
+    }
   }
 
   Future<void> close() async {
