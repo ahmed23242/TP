@@ -4,6 +4,7 @@ import '../../incidents/controllers/incident_controller.dart';
 import '../../incidents/widgets/incident_card.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../../core/network/connectivity_service.dart';
+import '../../incidents/widgets/stats_overview_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -132,6 +133,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      StatsOverviewWidget(),
+                      const SizedBox(height: 20),
                       const Icon(Icons.warning_amber_rounded, size: 64),
                       const SizedBox(height: 16),
                       const Text(
@@ -150,19 +153,25 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.all(8),
-            itemCount: _incidentController.incidents.length,
-            itemBuilder: (context, index) {
-              final incident = _incidentController.incidents[index];
-              return IncidentCard(
-                incident: incident,
-                onTap: () => Get.toNamed(
-                  '/incident/details',
-                  arguments: incident,
-                ),
-              );
-            },
+            children: [
+              StatsOverviewWidget(),
+              const SizedBox(height: 16),
+              ...List.generate(
+                _incidentController.incidents.length, 
+                (index) {
+                  final incident = _incidentController.incidents[index];
+                  return IncidentCard(
+                    incident: incident,
+                    onTap: () => Get.toNamed(
+                      '/incident/details',
+                      arguments: incident,
+                    ),
+                  );
+                }
+              ),
+            ],
           );
         }),
       ),

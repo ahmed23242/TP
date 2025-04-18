@@ -13,6 +13,7 @@ import 'features/incidents/screens/incident_history_screen.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/incidents/services/location_service.dart';
 import 'features/incidents/services/audio_service.dart';
+import 'features/incidents/services/stats_service.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/network/api_service.dart';
 import 'core/services/permission_service.dart';
@@ -41,6 +42,9 @@ void main() async {
     
     // Initialisation des services de gestion des incidents (après AudioService)
     Get.put(IncidentService(), permanent: true);
+    
+    // Initialisation du service de statistiques
+    final statsService = await Get.putAsync(() => StatsService().init());
     
     // Initialisation du contrôleur d'authentification (après les services)
     final authController = AuthController();
