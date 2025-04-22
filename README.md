@@ -178,6 +178,79 @@ The frontend is built with Flutter, a cross-platform UI toolkit that allows us t
    );
    ```
 
+   **Biometric Authentication Implementation Details:**
+   
+   The app uses the `local_auth` package to implement biometric authentication (fingerprint, face ID, etc.). Here's how it works:
+   
+   1. **Check Biometric Availability:**
+   ```dart
+   Future<bool> isBiometricAvailable() async {
+     final localAuth = LocalAuthentication();
+     final canCheckBiometrics = await localAuth.canCheckBiometrics;
+     final isDeviceSupported = await localAuth.isDeviceSupported();
+     return canCheckBiometrics && isDeviceSupported;
+   }
+   ```
+   
+   2. **Get Available Biometric Types:**
+   ```dart
+   Future<List<BiometricType>> getAvailableBiometrics() async {
+     final localAuth = LocalAuthentication();
+     return await localAuth.getAvailableBiometrics();
+   }
+   ```
+   
+   3. **Authenticate User:**
+   ```dart
+   Future<bool> authenticateUser() async {
+     final localAuth = LocalAuthentication();
+     try {
+       return await localAuth.authenticate(
+         localizedReason: 'Authenticate to access your account',
+         options: const AuthenticationOptions(
+           stickyAuth: true,
+           biometricOnly: false,
+         ),
+       );
+     } catch (e) {
+       print('Authentication error: $e');
+       return false;
+     }
+   }
+   ```
+   
+   4. **Integration with Login Flow:**
+   ```dart
+   void loginWithBiometrics() async {
+     // Check if biometrics are available
+     if (await isBiometricAvailable()) {
+       // Authenticate user
+       final authenticated = await authenticateUser();
+       if (authenticated) {
+         // Retrieve stored credentials from secure storage
+         final username = await _secureStorage.read(key: 'username');
+         final password = await _secureStorage.read(key: 'password');
+         
+         if (username != null && password != null) {
+           // Login with stored credentials
+           await loginWithCredentials(username, password);
+         } else {
+           // Handle case where credentials aren't stored
+           Get.snackbar('Error', 'No stored credentials found');
+         }
+       }
+     } else {
+       Get.snackbar('Not Available', 'Biometric authentication not available on this device');
+     }
+   }
+   ```
+   
+   5. **Security Considerations:**
+   - Biometric data never leaves the user's device
+   - Credentials are stored in secure storage (Flutter Secure Storage)
+   - Fallback to password authentication is always available
+   - Biometric settings can be toggled in app settings
+
 4. **Maps Integration**
    - Google Maps for incident location
    - Geolocation services
@@ -196,7 +269,214 @@ The frontend is built with Flutter, a cross-platform UI toolkit that allows us t
    )
    ```
 
-5. **Multi-language Support**
+5. **Media Handling (Images, Videos, Voice)**
+   - The app supports multiple media types for comprehensive incident documentation
+   
+   **Image Capture and Upload:**
+   ```dart
+   Future<void> captureImage(ImageSource source) async {
+     try {
+       final pickedFile = await ImagePicker().pickImage(
+         source: source,
+         imageQuality: 80,
+       );
+       
+       if (pickedFile != null) {
+         // Add to incident media list
+         final media = IncidentMedia(
+           file: File(pickedFile.path),
+           type: MediaType.image,
+           isUploaded: false,
+         );
+         
+         incidentMediaList.add(media);
+         update(); // Update UI
+         
+         // Prepare for upload when online
+         _mediaUploadQueue.add(media);
+       }
+     } catch (e) {
+       print('Error capturing image: $e');
+       Get.snackbar('Error', 'Failed to capture image');
+     }
+   }
+   ```
+   
+   **Video Recording:**
+   ```dart
+   Future<void> recordVideo() async {
+     try {
+       final pickedFile = await ImagePicker().pickVideo(
+         source: ImageSource.camera,
+         maxDuration: const Duration(minutes: 2), // Limit video length
+       );
+       
+       if (pickedFile != null) {
+         // Process video (compression, thumbnailing)
+         final compressedVideo = await _compressVideo(File(pickedFile.path));
+         
+         // Add to incident media list
+         final media = IncidentMedia(
+           file: compressedVideo,
+           type: MediaType.video,
+           isUploaded: false,
+           thumbnail: await _generateVideoThumbnail(compressedVideo.path),
+         );
+         
+         incidentMediaList.add(media);
+         update(); // Update UI
+         
+         // Prepare for upload when online
+         _mediaUploadQueue.add(media);
+       }
+     } catch (e) {
+       print('Error recording video: $e');
+       Get.snackbar('Error', 'Failed to record video');
+     }
+   }
+   
+   // Video compression helper
+   Future<File> _compressVideo(File videoFile) async {
+     // Implementation using video_compress package
+     final info = await VideoCompress.compressVideo(
+       videoFile.path,
+       quality: VideoQuality.MediumQuality,
+       deleteOrigin: false,
+     );
+     return File(info!.path!);
+   }
+   
+   // Thumbnail generation helper
+   Future<File?> _generateVideoThumbnail(String videoPath) async {
+     // Implementation using video_thumbnail package
+     final thumbnailPath = await VideoThumbnail.thumbnailFile(
+       video: videoPath,
+       imageFormat: ImageFormat.JPEG,
+       quality: 75,
+     );
+     return thumbnailPath != null ? File(thumbnailPath) : null;
+   }
+   ```
+   
+   **Voice Recording:**
+   ```dart
+   class VoiceRecordingController extends GetxController {
+     FlutterSoundRecorder? _recorder;
+     String? _recordingPath;
+     bool isRecording = false;
+     
+     @override
+     void onInit() {
+       super.onInit();
+       _initRecorder();
+     }
+     
+     Future<void> _initRecorder() async {
+       _recorder = FlutterSoundRecorder();
+       await _recorder!.openRecorder();
+     }
+     
+     Future<void> startRecording() async {
+       try {
+         // Get temp directory for storing recording
+         final tempDir = await getTemporaryDirectory();
+         _recordingPath = '${tempDir.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.aac';
+         
+         // Start recording
+         await _recorder!.startRecorder(toFile: _recordingPath);
+         isRecording = true;
+         update();
+       } catch (e) {
+         print('Error starting recording: $e');
+         Get.snackbar('Error', 'Failed to start recording');
+       }
+     }
+     
+     Future<String?> stopRecording() async {
+       try {
+         await _recorder!.stopRecorder();
+         isRecording = false;
+         update();
+         return _recordingPath;
+       } catch (e) {
+         print('Error stopping recording: $e');
+         Get.snackbar('Error', 'Failed to stop recording');
+         return null;
+       }
+     }
+     
+     Future<void> addVoiceNoteToIncident() async {
+       final path = await stopRecording();
+       if (path != null) {
+         // Add to incident media list
+         final media = IncidentMedia(
+           file: File(path),
+           type: MediaType.audio,
+           isUploaded: false,
+         );
+         
+         Get.find<IncidentController>().addMedia(media);
+       }
+     }
+     
+     @override
+     void onClose() {
+       _recorder?.closeRecorder();
+       super.onClose();
+     }
+   }
+   ```
+   
+   **Media Upload Management:**
+   ```dart
+   Future<void> uploadIncidentMedia(int incidentId, List<IncidentMedia> mediaList) async {
+     for (final media in mediaList) {
+       if (media.isUploaded) continue;
+       
+       try {
+         // Create multipart request
+         final request = http.MultipartRequest(
+           'POST',
+           Uri.parse('$apiUrl/incidents/$incidentId/media/'),
+         );
+         
+         // Add authorization header
+         request.headers.addAll({
+           'Authorization': 'Bearer $token',
+         });
+         
+         // Add file
+         request.files.add(
+           await http.MultipartFile.fromPath(
+             'file',
+             media.file.path,
+             contentType: _getMediaContentType(media.type),
+           ),
+         );
+         
+         // Add media type
+         request.fields['file_type'] = media.type.toString().split('.').last;
+         
+         // Send request
+         final response = await request.send();
+         
+         if (response.statusCode == 202) {
+           // Update media status
+           media.isUploaded = true;
+           update();
+         } else {
+           throw Exception('Failed to upload media: ${response.statusCode}');
+         }
+       } catch (e) {
+         print('Error uploading media: $e');
+         // Add to retry queue
+         _mediaUploadRetryQueue.add(media);
+       }
+     }
+   }
+   ```
+
+6. **Multi-language Support**
    - Internationalization with Flutter Intl
    - Language switching capability
    - Example code:
@@ -209,6 +489,63 @@ The frontend is built with Flutter, a cross-platform UI toolkit that allows us t
    
    // Using translations
    Text(AppLocalizations.of(context).incidentReportTitle)
+   ```
+   
+   **Language Selector Implementation:**
+   ```dart
+   class LanguageSelector extends StatelessWidget {
+     @override
+     Widget build(BuildContext context) {
+       return PopupMenuButton<String>(
+         icon: const Icon(Icons.language),
+         onSelected: (String languageCode) {
+           Get.find<SettingsController>().changeLanguage(languageCode);
+         },
+         itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+           PopupMenuItem<String>(
+             value: 'en',
+             child: Row(
+               children: [
+                 Image.asset('assets/flags/us.svg', width: 24, height: 24),
+                 const SizedBox(width: 10),
+                 const Text('English'),
+               ],
+             ),
+           ),
+           PopupMenuItem<String>(
+             value: 'es',
+             child: Row(
+               children: [
+                 Image.asset('assets/flags/es.svg', width: 24, height: 24),
+                 const SizedBox(width: 10),
+                 const Text('Español'),
+               ],
+             ),
+           ),
+           PopupMenuItem<String>(
+             value: 'fr',
+             child: Row(
+               children: [
+                 Image.asset('assets/flags/fr.svg', width: 24, height: 24),
+                 const SizedBox(width: 10),
+                 const Text('Français'),
+               ],
+             ),
+           ),
+           PopupMenuItem<String>(
+             value: 'ar',
+             child: Row(
+               children: [
+                 Image.asset('assets/flags/sa.svg', width: 24, height: 24),
+                 const SizedBox(width: 10),
+                 const Text('العربية'),
+               ],
+             ),
+           ),
+         ],
+       );
+     }
+   }
    ```
 
 ### <a name="backend"></a>Backend
