@@ -8,8 +8,11 @@ Tableau de bord
 
 {% block page_actions %}
 <div class="btn-group">
-    <a href="{% url 'admin_incidents_list' %}" class="btn btn-primary">
-        <i class="fas fa-list"></i> Liste des incidents
+    <a href="{% url 'admin_incidents_list' %}" class="btn btn-primary me-2">
+        <i class="fas fa-clipboard-list"></i> Liste des incidents
+    </a>
+    <a href="{% url 'admin_users_list' %}" class="btn btn-success">
+        <i class="fas fa-users"></i> Liste des utilisateurs
     </a>
 </div>
 {% endblock %}
@@ -161,7 +164,7 @@ Tableau de bord
         <div class="card shadow">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
                 <h6 class="m-0 font-weight-bold text-primary">Derniers utilisateurs inscrits</h6>
-                <a href="{% url 'admin:users_user_changelist' %}" class="btn btn-sm btn-primary">
+                <a href="{% url 'admin_users_list' %}" class="btn btn-sm btn-primary">
                     Tous les utilisateurs
                 </a>
             </div>
@@ -173,6 +176,7 @@ Tableau de bord
                                 <th>ID</th>
                                 <th>Nom</th>
                                 <th>Email</th>
+                                <th>Incidents</th>
                                 <th>Date d'inscription</th>
                                 <th>Actions</th>
                             </tr>
@@ -183,11 +187,19 @@ Tableau de bord
                                 <td>{{ user.id }}</td>
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.email }}</td>
+                                <td>
+                                    <a href="{% url 'admin_incidents_list' %}?user_id={{ user.id }}" class="badge bg-info text-white">
+                                        {{ user.incident_count }}
+                                    </a>
+                                </td>
                                 <td>{{ user.date_joined|date:"d/m/Y H:i" }}</td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="{% url 'admin:users_user_change' user.id %}" class="btn btn-primary">
+                                        <a href="{% url 'admin:users_user_change' user.id %}" class="btn btn-primary" title="Voir détails">
                                             <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'admin_incidents_list' %}?user_id={{ user.id }}" class="btn btn-info" title="Voir incidents">
+                                            <i class="fas fa-clipboard-list"></i>
                                         </a>
                                     </div>
                                 </td>

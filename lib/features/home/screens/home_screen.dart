@@ -84,43 +84,96 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accueil'),
+        title: Row(
+          children: [
+            Image.asset('assets/logo.png', height: 30),
+            SizedBox(width: 8),
+            Text('Incidents App', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        elevation: 0,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
         actions: [
           Obx(() => Padding(
             padding: const EdgeInsets.all(8.0),
-            child: _connectivityService.isConnected.value
-              ? const Icon(Icons.wifi, color: Colors.green)
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(Icons.wifi_off, color: Colors.red),
-                    Container(
-                      width: 20,
-                      height: 2,
-                      color: Colors.red,
-                      transform: Matrix4.rotationZ(0.785398), // 45 degrés en radians
-                    ),
-                  ],
-                ),
+            child: Tooltip(
+              message: _connectivityService.isConnected.value ? 'Connecté' : 'Hors ligne',
+              child: _connectivityService.isConnected.value
+                ? const Icon(Icons.wifi, color: Colors.white)
+                : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.wifi_off, color: Colors.white),
+                      Container(
+                        width: 20,
+                        height: 2,
+                        color: Colors.white,
+                        transform: Matrix4.rotationZ(0.785398), // 45 degrés en radians
+                      ),
+                    ],
+                  ),
+            ),
           )),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Actualiser',
             onPressed: () {
               _incidentController.loadIncidents();
               _statsService.refreshStats();
               _statsService.fetchUserDashboardStats();
+              Get.snackbar(
+                'Actualisation', 
+                'Données mises à jour',
+                snackPosition: SnackPosition.BOTTOM,
+                duration: Duration(seconds: 2),
+              );
             },
           ),
           PopupMenuButton(
+            icon: CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              child: Icon(
+                Icons.person,
+                size: 18, 
+                color: Colors.white
+              ),
+            ),
+            offset: Offset(0, 45),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'profile',
-                child: const Text('Mon profil'),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, color: Theme.of(context).primaryColor, size: 20),
+                    SizedBox(width: 12),
+                    Text('Mon profil'),
+                  ],
+                ),
                 onTap: () => Get.toNamed('/profile'),
               ),
               PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings, color: Colors.grey[700], size: 20),
+                    SizedBox(width: 12),
+                    Text('Paramètres'),
+                  ],
+                ),
+                onTap: () => Get.toNamed('/settings'),
+              ),
+              PopupMenuItem(
                 value: 'logout',
-                child: const Text('Déconnexion'),
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.red, size: 20),
+                    SizedBox(width: 12),
+                    Text('Déconnexion', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
                 onTap: () => _authController.logout(),
               ),
             ],
@@ -134,16 +187,27 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         child: Obx(() {
           if (_incidentController.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Chargement des données...', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
           }
 
           return ListView(
-            padding: const EdgeInsets.all(12),
-                    children: [
+            padding: const EdgeInsets.all(16),
+            children: [
               _buildStatsSection(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               _buildQuickActionsBar(),
-                      const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              _buildRecentIncidentsHeader(),
+              const SizedBox(height: 12),
               if (_incidentController.incidents.isEmpty)
                 _buildEmptyState()
               else
@@ -152,41 +216,63 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Get.toNamed('/incident/create'),
         tooltip: 'Signaler un incident',
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Signaler'),
+        elevation: 4,
       ),
     );
   }
 
   Widget _buildStatsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Status Overview',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Tableau de bord',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
-            ),
-            TextButton.icon(
-              icon: Icon(Icons.swap_horiz),
-              label: Text('Toggle View'),
-              onPressed: () => _toggleStatsView(),
-            ),
-          ],
-        ),
-        SizedBox(height: 8),
-        Obx(() => _showUserStats.value
-          ? UserStatsWidget()
-          : StatsOverviewWidget(isCompact: true)
-        ),
-      ],
+              ElevatedButton.icon(
+                icon: Icon(_showUserStats.value ? Icons.public : Icons.person, size: 18),
+                label: Text(_showUserStats.value ? 'Global' : 'Personnel', style: TextStyle(fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                onPressed: () => _toggleStatsView(),
+              ),
+            ],
+          ),
+          Divider(height: 24),
+          Obx(() => _showUserStats.value
+            ? UserStatsWidget()
+            : StatsOverviewWidget(isCompact: true)
+          ),
+        ],
+      ),
     );
   }
   
@@ -205,45 +291,62 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Widget _buildQuickActionsBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
-            blurRadius: 3,
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildActionButton(
-            icon: Icons.add_circle,
-            label: 'Signaler',
-            color: Colors.blue,
-            onTap: () => Get.toNamed('/incident/create'),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 12),
+            child: Text(
+              'Actions rapides',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
           ),
-          _buildActionButton(
-            icon: Icons.history,
-            label: 'Historique',
-            color: Colors.purple,
-            onTap: () => Get.toNamed('/incidents'),
-          ),
-          _buildActionButton(
-            icon: Icons.sync,
-            label: 'Synchroniser',
-            color: Colors.green,
-            onTap: () => _incidentController.syncIncidents(),
-          ),
-          _buildActionButton(
-            icon: Icons.map,
-            label: 'Carte',
-            color: Colors.orange,
-            onTap: () => Get.toNamed('/map'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildActionButton(
+                icon: Icons.add_circle,
+                label: 'Signaler',
+                color: Colors.blue,
+                onTap: () => Get.toNamed('/incident/create'),
+              ),
+              _buildActionButton(
+                icon: Icons.history,
+                label: 'Historique',
+                color: Colors.purple,
+                onTap: () => Get.toNamed('/incidents'),
+              ),
+              Obx(() => _buildActionButton(
+                icon: Icons.sync,
+                label: 'Synchroniser',
+                color: Colors.green,
+                badge: _statsService.pendingIncidents.value,
+                onTap: () => _incidentController.syncIncidents(),
+              )),
+              _buildActionButton(
+                icon: Icons.map,
+                label: 'Carte',
+                color: Colors.orange,
+                onTap: () => Get.toNamed('/map'),
+              ),
+            ],
           ),
         ],
       ),
@@ -255,53 +358,58 @@ class _HomeScreenState extends State<HomeScreen> {
     required String label,
     required Color color,
     required VoidCallback onTap,
+    int badge = 0,
   }) {
     return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-              ),
-            ],
-          ),
-      ),
-    );
-  }
-  
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 30),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 70,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              size: 48,
-              color: Colors.orange,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucun incident signalé',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    right: -5,
+                    top: -5,
+                    child: Container(
+                      padding: EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: BoxConstraints(minWidth: 18, minHeight: 18),
+                      child: Center(
+                        child: Text(
+                          badge > 9 ? '9+' : '$badge',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Utilisez le bouton ci-dessus pour signaler un incident',
+            Text(
+              label,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[800],
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -309,10 +417,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
+  Widget _buildRecentIncidentsHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Incidents récents',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        TextButton(
+          onPressed: () => Get.toNamed('/incidents'),
+          child: Text('Voir tout'),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).primaryColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      margin: const EdgeInsets.only(top: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/empty_state.png',
+            height: 120,
+            width: 120,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Aucun incident signalé',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Utilisez le bouton "Signaler" pour ajouter un nouvel incident',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Get.toNamed('/incident/create'),
+            icon: const Icon(Icons.add),
+            label: const Text('Signaler un incident'),
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   List<Widget> _buildIncidentsList() {
-    return _incidentController.incidents.map((incident) => 
+    // Only show the 5 most recent incidents on the home screen
+    final recentIncidents = _incidentController.incidents.take(5).toList();
+    
+    return recentIncidents.map((incident) => 
       Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
+        padding: const EdgeInsets.only(bottom: 12.0),
         child: IncidentCard(
           incident: incident,
           onTap: () => Get.toNamed(

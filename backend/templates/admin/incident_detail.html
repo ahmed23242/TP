@@ -15,8 +15,9 @@ Incident #{{ incident.id }} - {{ incident.title }}
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
+<!-- Mobile-friendly container with proper spacing -->
+<div class="row g-4">
+    <div class="col-lg-8 col-md-12">
         <!-- Information principale -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -112,28 +113,113 @@ Incident #{{ incident.id }} - {{ incident.title }}
     </div>
     
     <!-- Colonne latérale -->
-    <div class="col-md-4">
-        <!-- Photo de l'incident -->
+    <div class="col-lg-4 col-md-12">
+        <!-- Média principal de l'incident -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="card-title mb-0">Photo</h5>
+                <h5 class="card-title mb-0">Média principal</h5>
             </div>
             <div class="card-body text-center">
-                {% if incident.photo %}
-                <a href="{{ incident.photo.url }}" target="_blank" class="d-block">
-                    <img src="{{ incident.photo.url }}" alt="Photo de l'incident" class="img-fluid rounded">
-                </a>
-                <a href="{{ incident.photo.url }}" download class="btn btn-sm btn-outline-primary mt-3">
-                    <i class="fas fa-download"></i> Télécharger
-                </a>
+                {% if incident.photo and incident.photo.name %}
+                    {% with ext=incident.photo.url|lower %}
+                        {% if '.mp4' in ext or '.mov' in ext or '.avi' in ext or '.webm' in ext %}
+                            <!-- Vidéo -->
+                            <div class="ratio ratio-16x9 mb-3">
+                                <video controls class="rounded">
+                                    <source src="{{ incident.photo.url }}" type="video/mp4">
+                                    Votre navigateur ne supporte pas la lecture vidéo.
+                                </video>
+                            </div>
+                        {% else %}
+                            <!-- Image -->
+                            <a href="{{ incident.photo.url }}" target="_blank" class="d-block" data-bs-toggle="modal" data-bs-target="#imageModal">
+                                <img src="{{ incident.photo.url }}" alt="Photo de l'incident" class="img-fluid rounded" style="max-height: 300px;">
+                            </a>
+                        {% endif %}
+                    {% endwith %}
+                    <div class="mt-3">
+                        <a href="{{ incident.photo.url }}" target="_blank" class="btn btn-sm btn-primary me-2">
+                            <i class="fas fa-external-link-alt"></i> Ouvrir
+                        </a>
+                        <a href="{{ incident.photo.url }}" download class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-download"></i> Télécharger
+                        </a>
+                    </div>
                 {% else %}
                 <div class="text-muted py-5">
                     <i class="fas fa-camera fa-3x mb-3"></i>
-                    <p>Aucune photo disponible</p>
+                    <p>Aucun média disponible</p>
                 </div>
                 {% endif %}
             </div>
         </div>
+        
+        <!-- Médias additionnels -->
+        {% if incident.additional_media.all %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Médias additionnels ({{ incident.additional_media.all|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    {% for media in incident.additional_media.all %}
+                    <div class="col-6 col-sm-4 p-1">
+                        <div class="media-thumbnail position-relative">
+                            {% if media.is_image %}
+                            <a href="{{ media.media_file.url }}" class="d-block" data-bs-toggle="modal" data-bs-target="#mediaModal{{ media.id }}">
+                                <img src="{{ media.media_file.url }}" alt="{{ media.caption|default:'Media' }}" class="img-fluid rounded" style="height: 120px; width: 100%; object-fit: cover;">
+                            </a>
+                            {% else %}
+                            <a href="{{ media.media_file.url }}" class="d-block position-relative" data-bs-toggle="modal" data-bs-target="#mediaModal{{ media.id }}">
+                                <div class="ratio ratio-1x1" style="height: 120px; background-color: #000;">
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-play-circle text-white fa-3x"></i>
+                                    </div>
+                                </div>
+                            </a>
+                            {% endif %}
+                            <div class="media-type position-absolute top-0 end-0 m-1">
+                                <span class="badge {% if media.is_image %}bg-info{% else %}bg-danger{% endif %} rounded-pill">
+                                    <i class="fas {% if media.is_image %}fa-image{% else %}fa-video{% endif %}"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal pour chaque média -->
+                    <div class="modal fade" id="mediaModal{{ media.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-xl modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">{{ media.caption|default:'Media' }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                                </div>
+                                <div class="modal-body p-0 text-center">
+                                    {% if media.is_image %}
+                                    <img src="{{ media.media_file.url }}" class="img-fluid" alt="{{ media.caption|default:'Media' }}">
+                                    {% else %}
+                                    <div class="ratio ratio-16x9">
+                                        <video controls class="rounded">
+                                            <source src="{{ media.media_file.url }}" type="video/mp4">
+                                            Votre navigateur ne supporte pas la lecture vidéo.
+                                        </video>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="modal-footer">
+                                    <a href="{{ media.media_file.url }}" download class="btn btn-primary">
+                                        <i class="fas fa-download"></i> Télécharger
+                                    </a>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
         
         <!-- Enregistrement audio -->
         <div class="card mb-4">
@@ -142,15 +228,26 @@ Incident #{{ incident.id }} - {{ incident.title }}
             </div>
             <div class="card-body text-center">
                 {% if incident.voice_note %}
-                <div class="audio-player">
+                <div class="audio-player p-3 bg-light rounded">
+                    <div class="mb-3">
+                        <i class="fas fa-volume-up fa-2x text-primary mb-2"></i>
+                        <p class="small text-muted mb-2">Cliquez sur play pour écouter l'enregistrement</p>
+                    </div>
                     <audio controls class="w-100 mb-3">
                         <source src="{{ incident.voice_note.url }}" type="audio/mpeg">
+                        <source src="{{ incident.voice_note.url }}" type="audio/wav">
+                        <source src="{{ incident.voice_note.url }}" type="audio/ogg">
                         Votre navigateur ne supporte pas l'élément audio.
                     </audio>
                 </div>
-                <a href="{{ incident.voice_note.url }}" download class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-download"></i> Télécharger
-                </a>
+                <div class="mt-3">
+                    <a href="{{ incident.voice_note.url }}" target="_blank" class="btn btn-sm btn-primary me-2">
+                        <i class="fas fa-play-circle"></i> Écouter dans un nouvel onglet
+                    </a>
+                    <a href="{{ incident.voice_note.url }}" download class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download"></i> Télécharger
+                    </a>
+                </div>
                 {% else %}
                 <div class="text-muted py-5">
                     <i class="fas fa-microphone-slash fa-3x mb-3"></i>
@@ -185,6 +282,35 @@ Incident #{{ incident.id }} - {{ incident.title }}
         </div>
     </div>
 </div>
+
+<!-- Modal d'image agrandie -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Photo de l'incident #{{ incident.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0 text-center">
+                {% if incident.photo and incident.photo.name %}
+                    <img src="{{ incident.photo.url }}" class="img-fluid" alt="Photo de l'incident">
+                {% else %}
+                    <div class="alert alert-warning">L'image n'est pas disponible</div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                {% if incident.photo and incident.photo.name %}
+                    <a href="{{ incident.photo.url }}" download class="btn btn-primary">
+                        <i class="fas fa-download"></i> Télécharger
+                    </a>
+                {% endif %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 
 <!-- Modal de suppression -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">

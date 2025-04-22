@@ -2,19 +2,27 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.http import HttpResponseRedirect
 from django.urls import path
-from .models import Incident
+from .models import Incident, IncidentMedia
+
+class IncidentMediaInline(admin.TabularInline):
+    model = IncidentMedia
+    extra = 1
+    fields = ('media_file', 'media_type', 'caption')
 
 @admin.register(Incident)
 class IncidentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'incident_type', 'status', 'user', 'created_at')
-    list_filter = ('incident_type', 'status', 'created_at')
-    search_fields = ('title', 'description', 'user__username')
-    list_display_links = None  # This removes the edit links from the list view
+    list_display = ('title', 'incident_type', 'status', 'user', 'created_at', 'sync_status')
+    list_filter = ('incident_type', 'status', 'sync_status', 'created_at', 'user')
+    search_fields = ('title', 'description', 'user__username', 'user__email')
+    list_display_links = ('title',)  # Make title clickable for details
+    list_per_page = 20  # Add pagination with 20 items per page
     fields = (
         'title', 'description', 'incident_type', 'status', 'user',
         'created_at', 'updated_at', 'sync_status',
         'display_location', 'display_photo', 'display_voice_note'
     )
+    
+    inlines = [IncidentMediaInline]
     date_hierarchy = 'created_at'
     
     def get_readonly_fields(self, request, obj=None):
@@ -30,8 +38,8 @@ class IncidentAdmin(admin.ModelAdmin):
         return False
         
     def has_delete_permission(self, request, obj=None):
-        # Prevent deleting incidents from admin
-        return False
+        # Allow deleting incidents from admin
+        return True
     
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)

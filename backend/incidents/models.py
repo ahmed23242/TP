@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import os
 
 # Create your models here.
 
@@ -49,7 +50,40 @@ class Incident(models.Model):
 
     class Meta:
         db_table = 'incidents'
-        ordering = ['-created_at']
-
+        
     def __str__(self):
-        return f"{self.incident_type} - {self.title}"
+        return f"{self.title} (ID: {self.id})"
+
+
+class IncidentMedia(models.Model):
+    MEDIA_TYPES = (
+        ('image', 'Image'),
+        ('video', 'Video'),
+    )
+    
+    incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name='additional_media')
+    media_file = models.FileField(upload_to='incidents/media/')
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPES, default='image')
+    caption = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'incident_media'
+        verbose_name = 'Incident Media'
+        verbose_name_plural = 'Incident Media'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Media for {self.incident.title} (ID: {self.incident.id})"
+    
+    @property
+    def filename(self):
+        return os.path.basename(self.media_file.name)
+    
+    @property
+    def is_image(self):
+        return self.media_type == 'image'
+    
+    @property
+    def is_video(self):
+        return self.media_type == 'video'

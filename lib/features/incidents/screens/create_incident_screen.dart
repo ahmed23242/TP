@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../models/incident.dart';
 import '../controllers/incident_controller.dart';
 import '../widgets/audio_recorder_widget.dart';
@@ -31,6 +32,11 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   LatLng? _selectedLocation;
   bool _isLoading = false;
   String _selectedIncidentType = 'general';
+  
+  // Media files storage
+  final List<Map<String, dynamic>> _additionalMedia = [];
+  VideoPlayerController? _videoPlayerController;
+  bool _isVideoPlaying = false;
   
   // Liste des types d'incidents
   final List<Map<String, String>> _incidentTypes = [
@@ -67,6 +73,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _videoPlayerController?.dispose();
     super.dispose();
   }
 
@@ -117,6 +124,147 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
       Get.snackbar('Error', 'Failed to capture photo: $e');
     }
   }
+  
+  Future<void> _pickImage() async {
+    try {
+      final status = await Permission.photos.request();
+      if (status != PermissionStatus.granted) {
+        Get.snackbar(
+          'Error',
+          'Gallery permission denied',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1800,
+        maxHeight: 1800,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _additionalMedia.add({
+            'type': 'image',
+            'path': pickedFile.path,
+            'caption': 'Image ${_additionalMedia.length + 1}'
+          });
+        });
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to pick image: $e');
+    }
+  }
+  
+  Future<void> _recordVideo() async {
+    try {
+      final cameraStatus = await Permission.camera.request();
+      final microphoneStatus = await Permission.microphone.request();
+      
+      if (cameraStatus != PermissionStatus.granted || 
+          microphoneStatus != PermissionStatus.granted) {
+        Get.snackbar(
+          'Error',
+          'Camera and microphone permissions are required to record video',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final pickedFile = await _imagePicker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 60),
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _additionalMedia.add({
+            'type': 'video',
+            'path': pickedFile.path,
+            'caption': 'Video ${_additionalMedia.length + 1}'
+          });
+          
+          // Initialize video player for preview
+          _initializeVideoPlayer(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to record video: $e');
+    }
+  }
+  
+  Future<void> _pickVideo() async {
+    try {
+      final status = await Permission.photos.request();
+      if (status != PermissionStatus.granted) {
+        Get.snackbar(
+          'Error',
+          'Gallery permission denied',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final pickedFile = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 2),
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _additionalMedia.add({
+            'type': 'video',
+            'path': pickedFile.path,
+            'caption': 'Video ${_additionalMedia.length + 1}'
+          });
+          
+          // Initialize video player for preview
+          _initializeVideoPlayer(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to pick video: $e');
+    }
+  }
+  
+  Future<void> _initializeVideoPlayer(String videoPath) async {
+    // Dispose previous controller if exists
+    await _videoPlayerController?.dispose();
+    
+    // Create new controller
+    _videoPlayerController = VideoPlayerController.file(File(videoPath));
+    
+    // Initialize and update UI when ready
+    await _videoPlayerController!.initialize();
+    setState(() {});
+  }
+  
+  void _toggleVideoPlayback() {
+    if (_videoPlayerController == null) return;
+    
+    setState(() {
+      if (_videoPlayerController!.value.isPlaying) {
+        _videoPlayerController!.pause();
+        _isVideoPlaying = false;
+      } else {
+        _videoPlayerController!.play();
+        _isVideoPlaying = true;
+      }
+    });
+  }
+  
+  void _removeMedia(int index) {
+    setState(() {
+      _additionalMedia.removeAt(index);
+    });
+  }
+  
+  void _updateMediaCaption(int index, String caption) {
+    setState(() {
+      _additionalMedia[index]['caption'] = caption;
+    });
+  }
 
   void _onRecordingComplete(String? path) {
     setState(() => _voiceNotePath = path);
@@ -148,6 +296,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
           latitude: _selectedLocation!.latitude,
           longitude: _selectedLocation!.longitude,
           incidentType: _selectedIncidentType,
+          additionalMedia: _additionalMedia,
         );
         
         Get.back();
@@ -253,32 +402,238 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _getCurrentLocation,
-                      icon: const Icon(Icons.location_on),
-                      label: Text(_selectedLocation != null
-                          ? 'Location: ${_selectedLocation!.latitude.toStringAsFixed(4)}, ${_selectedLocation!.longitude.toStringAsFixed(4)}'
-                          : 'Get Current Location'),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedLocation != null
+                                ? 'Location: ${_selectedLocation!.latitude.toStringAsFixed(4)}, ${_selectedLocation!.longitude.toStringAsFixed(4)}'
+                                : 'Add Location',
+                              style: TextStyle(
+                                fontWeight: _selectedLocation != null ? FontWeight.normal : FontWeight.bold,
+                                color: _selectedLocation != null ? Colors.black87 : Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ),
+                          FloatingActionButton.small(
+                            heroTag: 'getLocation',
+                            onPressed: _getCurrentLocation,
+                            backgroundColor: Theme.of(context).primaryColor,
+                            child: const Icon(Icons.location_on, color: Colors.white),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _takePhoto,
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(_photoPath != null ? 'Photo Taken' : 'Take Photo'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _photoPath != null ? 'Main Photo:' : 'Add Main Photo:',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        FloatingActionButton.small(
+                          heroTag: 'takePhoto',
+                          onPressed: _takePhoto,
+                          backgroundColor: Theme.of(context).primaryColor,
+                          child: const Icon(Icons.camera_alt, color: Colors.white),
+                        ),
+                      ],
                     ),
-                    if (_photoPath != null) ...[
+                    if (_photoPath != null) ...[                      
                       const SizedBox(height: 8),
-                      Image.file(
-                        File(_photoPath!),
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(_photoPath!),
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Additional Media:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Row(
+                          children: [
+                            // Image picker button
+                            FloatingActionButton.small(
+                              heroTag: 'pickImage',
+                              onPressed: _pickImage,
+                              backgroundColor: Colors.green,
+                              child: const Icon(Icons.photo_library, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            // Video recorder button
+                            FloatingActionButton.small(
+                              heroTag: 'recordVideo',
+                              onPressed: _recordVideo,
+                              backgroundColor: Colors.red,
+                              child: const Icon(Icons.videocam, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            // Video picker button
+                            FloatingActionButton.small(
+                              heroTag: 'pickVideo',
+                              onPressed: _pickVideo,
+                              backgroundColor: Colors.purple,
+                              child: const Icon(Icons.video_library, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    
+                    if (_additionalMedia.isNotEmpty) ...[                      
+                      const SizedBox(height: 16),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey[300]!),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Additional Media (${_additionalMedia.length})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              height: 120,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _additionalMedia.length,
+                                itemBuilder: (context, index) {
+                                  final media = _additionalMedia[index];
+                                  return Container(
+                                    width: 120,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.1),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        // Media preview
+                                        Positioned.fill(
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(12),
+                                            child: media['type'] == 'image'
+                                                ? Image.file(
+                                                    File(media['path']),
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : Stack(
+                                                    alignment: Alignment.center,
+                                                    children: [
+                                                      Container(
+                                                        color: Colors.black,
+                                                        width: double.infinity,
+                                                        height: double.infinity,
+                                                      ),
+                                                      const Icon(
+                                                        Icons.play_circle_fill,
+                                                        color: Colors.white,
+                                                        size: 40,
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ),
+                                        ),
+                                        
+                                        // Type indicator
+                                        Positioned(
+                                          bottom: 8,
+                                          left: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: media['type'] == 'image' ? Colors.green : Colors.red,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  media['type'] == 'image' ? Icons.image : Icons.videocam,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  media['type'] == 'image' ? 'Image' : 'Video',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        
+                                        // Remove button
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: GestureDetector(
+                                            onTap: () => _removeMedia(index),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.6),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                     const SizedBox(height: 16),
                     const Text(
                       'Voice Note:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     AudioRecorderWidget(
                       onRecordingComplete: _onRecordingComplete,
@@ -286,18 +641,35 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                     ),
                     if (_selectedLocation != null) ...[
                       const SizedBox(height: 16),
-                      SizedBox(
+                      Container(
                         height: 200,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
                         child: FlutterMap(
                           options: MapOptions(
                             initialCenter: _selectedLocation!,
                             initialZoom: 15.0,
+                            interactionOptions: const InteractionOptions(
+                              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                            ),
                           ),
                           children: [
                             TileLayer(
-                              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              subdomains: const ['a', 'b', 'c'],
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'com.accidentsapp',
+                              tileProvider: NetworkTileProvider(),
+                              maxZoom: 19,
+                              tileSize: 256,
+                              keepBuffer: 5,
                             ),
                             MarkerLayer(
                               markers: [
@@ -318,14 +690,27 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submitIncident,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 16),
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submitIncident,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text(
+                                'Submit Report',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
                       ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator()
-                          : const Text('Submit Report'),
                     ),
                   ],
                 ),

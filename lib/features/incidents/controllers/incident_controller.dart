@@ -65,7 +65,8 @@ class IncidentController extends GetxController {
     String? voiceNotePath,
     required double latitude,
     required double longitude,
-    String incidentType = 'general',
+    required String incidentType,
+    List<Map<String, dynamic>>? additionalMedia,
   }) async {
     try {
       isLoading.value = true;
@@ -111,6 +112,7 @@ class IncidentController extends GetxController {
         incidentType: incidentType,
         syncStatus: 'pending',
         userId: userId,
+        additionalMedia: additionalMedia ?? [],
       );
 
       // Enregistrer l'incident et l'ajouter à la liste

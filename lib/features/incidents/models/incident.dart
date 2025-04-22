@@ -12,6 +12,7 @@ class Incident {
   final String incidentType;
   final String syncStatus;
   final int userId;
+  final List<Map<String, dynamic>> additionalMedia;
 
   Incident({
     required this.id,
@@ -27,6 +28,7 @@ class Incident {
     this.incidentType = 'general',
     required this.syncStatus,
     required this.userId,
+    this.additionalMedia = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -43,6 +45,7 @@ class Incident {
       'incident_type': incidentType,
       'sync_status': syncStatus,
       'user_id': userId,
+      'additional_media': additionalMedia,
     };
   }
 
@@ -61,6 +64,9 @@ class Incident {
       incidentType: map['incident_type'] ?? 'general',
       syncStatus: map['sync_status'] as String,
       userId: map['user_id'] as int,
+      additionalMedia: map['additional_media'] != null 
+        ? List<Map<String, dynamic>>.from(map['additional_media'])
+        : [],
     );
   }
   
@@ -79,6 +85,7 @@ class Incident {
     String? incidentType,
     String? syncStatus,
     int? userId,
+    List<Map<String, dynamic>>? additionalMedia,
   }) {
     return Incident(
       id: id ?? this.id,
@@ -94,6 +101,7 @@ class Incident {
       incidentType: incidentType ?? this.incidentType,
       syncStatus: syncStatus ?? this.syncStatus,
       userId: userId ?? this.userId,
+      additionalMedia: additionalMedia ?? this.additionalMedia,
     );
   }
 }

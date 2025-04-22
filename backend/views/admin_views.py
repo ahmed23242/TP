@@ -4,7 +4,10 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.core.paginator import Paginator
+from django.db.models import Count
 from incidents.models import Incident
+from users.models import User
 from backend.forms import IncidentForm
 
 @login_required
@@ -113,3 +116,51 @@ def admin_incident_update_status(request, incident_id):
     if referer:
         return HttpResponseRedirect(referer)
     return redirect('admin_incidents_list')
+
+@login_required
+@staff_member_required
+def admin_users_list(request):
+    users = User.objects.all().order_by('-date_joined')
+    
+    # Add incident count to each user
+    users = users.annotate(incident_count=Count('incident'))
+    
+    # Filters
+    role_filter = request.GET.get('role', '')
+    search_query = request.GET.get('search', '')
+    
+    if role_filter:
+        users = users.filter(role=role_filter)
+    if search_query:
+        users = users.filter(username__icontains=search_query) | \
+               users.filter(email__icontains=search_query) | \
+               users.filter(phone__icontains=search_query)
+    
+    # Pagination
+    paginator = Paginator(users, 20)  # 20 users per page
+    page_number = request.GET.get('page', 1)
+    users_page = paginator.get_page(page_number)
+    
+    return render(request, 'admin/users_list.html', {
+        'users': users_page,
+        'role_filter': role_filter,
+        'search_query': search_query,
+    })
+
+@login_required
+@staff_member_required
+def admin_user_delete(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    
+    if request.method == 'POST':
+        # Delete all incidents associated with this user
+        Incident.objects.filter(user=user).delete()
+        
+        # Delete the user
+        username = user.username
+        user.delete()
+        
+        messages.success(request, f"L'utilisateur {username} et tous ses incidents ont été supprimés.")
+        return redirect('admin_users_list')
+    
+    return redirect('admin_users_list')

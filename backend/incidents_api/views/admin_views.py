@@ -63,8 +63,8 @@ def admin_dashboard(request):
     total_users = User.objects.count()
     active_users = User.objects.filter(is_active=True).count()
     
-    # Derniers utilisateurs inscrits (5 derniers)
-    latest_users = User.objects.all().order_by('-date_joined')[:5]
+    # Derniers utilisateurs inscrits (5 derniers) avec le nombre d'incidents
+    latest_users = User.objects.all().annotate(incident_count=Count('incidents')).order_by('-date_joined')[:5]
     
     # Incidents récents (7 derniers jours)
     week_ago = timezone.now() - timedelta(days=7)
@@ -160,6 +160,10 @@ def admin_incidents_list(request):
     status_filter = request.GET.get('status', '')
     type_filter = request.GET.get('type', '')
     search_query = request.GET.get('q', '')
+    user_id = request.GET.get('user_id', '')
+    
+    # Filter title for when viewing a specific user's incidents
+    page_title = 'Liste des incidents'
     
     if status_filter:
         incidents = incidents.filter(status=status_filter)
@@ -167,13 +171,31 @@ def admin_incidents_list(request):
         incidents = incidents.filter(incident_type=type_filter)
     if search_query:
         incidents = incidents.filter(title__icontains=search_query) | incidents.filter(description__icontains=search_query)
+    if user_id:
+        # Filter incidents by user ID
+        try:
+            user_id = int(user_id)
+            incidents = incidents.filter(user_id=user_id)
+            
+            # Get the username for the title
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                user = User.objects.get(id=user_id)
+                page_title = f'Incidents de {user.username}'
+            except User.DoesNotExist:
+                pass
+        except ValueError:
+            # Invalid user ID format
+            pass
     
     return render(request, 'admin/incidents_list.html', {
-        'page_title': 'Liste des incidents',
+        'page_title': page_title,
         'incidents': incidents,
         'status_filter': status_filter,
         'type_filter': type_filter,
         'search_query': search_query,
+        'user_id': user_id,  # Pass the user_id to the template
         'incident_types': dict(Incident.INCIDENT_TYPES),
         'status_choices': dict(Incident.STATUS_CHOICES),
     })
@@ -305,3 +327,91 @@ def admin_incident_update_status(request, incident_id):
     if referer:
         return HttpResponseRedirect(referer)
     return redirect('admin_incidents_list')
+
+
+@login_required
+@user_passes_test(is_staff)
+def admin_users_list(request):
+    """Vue pour afficher la liste des utilisateurs"""
+    # Import User model here to avoid circular imports
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    users = User.objects.all().order_by('-date_joined')
+    
+    # Add incident count to each user
+    users = users.annotate(incident_count=Count('incidents'))
+    
+    # Filters
+    role_filter = request.GET.get('role', '')
+    search_query = request.GET.get('search', '')
+    
+    if role_filter:
+        users = users.filter(role=role_filter)
+    if search_query:
+        users = users.filter(username__icontains=search_query) | \
+               users.filter(email__icontains=search_query) | \
+               users.filter(phone__icontains=search_query)
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(users, 20)  # 20 users per page
+    page_number = request.GET.get('page', 1)
+    users_page = paginator.get_page(page_number)
+    
+    return render(request, 'admin/users_list.html', {
+        'users': users_page,
+        'role_filter': role_filter,
+        'search_query': search_query,
+    })
+
+
+@login_required
+@user_passes_test(is_staff)
+def admin_user_delete(request, user_id):
+    """Vue pour supprimer un utilisateur et tous ses incidents"""
+    # Import User model here to avoid circular imports
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    user = get_object_or_404(User, id=user_id)
+    
+    if request.method == 'POST':
+        # Delete all incidents associated with this user
+        Incident.objects.filter(user=user).delete()
+        
+        # Delete the user
+        username = user.username
+        user.delete()
+        
+        messages.success(request, f"L'utilisateur {username} et tous ses incidents ont été supprimés.")
+        return redirect('admin_users_list')
+
+
+@login_required
+@user_passes_test(is_staff)
+def admin_incident_add_media(request, incident_id):
+    """Vue pour ajouter un média additionnel à un incident"""
+    incident = get_object_or_404(Incident, id=incident_id)
+    
+    if request.method == 'POST' and request.FILES.get('media_file'):
+        from incidents.models import IncidentMedia
+        
+        media_file = request.FILES['media_file']
+        media_type = request.POST.get('media_type', 'image')
+        caption = request.POST.get('caption', '')
+        
+        # Créer le nouveau média
+        new_media = IncidentMedia(
+            incident=incident,
+            media_file=media_file,
+            media_type=media_type,
+            caption=caption
+        )
+        new_media.save()
+        
+        messages.success(request, "Le média a été ajouté avec succès.")
+    else:
+        messages.error(request, "Veuillez sélectionner un fichier à télécharger.")
+    
+    return redirect('admin_incident_detail', incident_id=incident.id)
