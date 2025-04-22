@@ -5,14 +5,32 @@ import '../../../core/network/connectivity_service.dart';
 import '../../../core/network/api_service.dart';
 import '../models/incident.dart';
 import 'incident_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'stats_service.dart';
 
-class SyncService extends GetxController {
+class SyncService extends GetxService {
   final RxBool isSyncing = false.obs;
-  late final Worker _connectivityWorker;
+  Worker? _connectivityWorker;
+  Timer? _periodicSyncTimer;
   
   final ConnectivityService _connectivityService = Get.find<ConnectivityService>();
   final IncidentService _incidentService = Get.find<IncidentService>();
   final ApiService _apiService = Get.find<ApiService>();
+  
+  // Implement async initialization pattern
+  Future<SyncService> init() async {
+    developer.log('Initializing SyncService');
+    _setupConnectivityListener();
+    _setupPeriodicSync();
+    
+    // Try to sync on startup if internet is available
+    if (_connectivityService.isConnected.value) {
+      Future.delayed(const Duration(seconds: 2), () => syncPendingIncidents());
+    }
+    
+    developer.log('SyncService initialized');
+    return this;
+  }
   
   @override
   void onInit() {
@@ -27,26 +45,35 @@ class SyncService extends GetxController {
   
   @override
   void onClose() {
-    _connectivityWorker.dispose();
+    _connectivityWorker?.dispose();
+    _periodicSyncTimer?.cancel();
     super.onClose();
+  }
+  
+  // Set up periodic sync to run every 15 minutes
+  void _setupPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      if (_connectivityService.isConnected.value) {
+        developer.log('Running periodic sync (every 15 minutes)');
+        syncPendingIncidents();
+      }
+    });
   }
   
   // Configurer l'écouteur de connectivité
   void _setupConnectivityListener() {
     _connectivityWorker = ever(
-      _connectivityService.connectivityChangedEvent, 
-      (_) => _handleConnectivityChange()
+      _connectivityService.isConnected, 
+      (bool isConnected) {
+        if (isConnected) {
+          developer.log('SyncService: Connection restored, starting auto-sync...');
+          syncPendingIncidents();
+        } else {
+          developer.log('SyncService: Connection lost');
+        }
+      }
     );
-  }
-  
-  // Gérer les changements de connectivité
-  Future<void> _handleConnectivityChange() async {
-    if (_connectivityService.isConnected.value) {
-      developer.log('SyncService: Connection restored, starting sync...');
-      await syncPendingIncidents();
-    } else {
-      developer.log('SyncService: Connection lost');
-    }
   }
   
   // Synchroniser les incidents en attente
@@ -102,6 +129,29 @@ class SyncService extends GetxController {
           developer.log('SyncService: Error syncing incident ${incident.id}', error: e);
           failCount++;
           // Continuer avec le prochain incident même si celui-ci échoue
+        }
+      }
+      
+      // Refresh incidents list after syncing
+      if (successCount > 0) {
+        try {
+          // Get the current user ID from storage or use default value 1 for testing
+          final storage = const FlutterSecureStorage();
+          final userIdStr = await storage.read(key: 'user_id');
+          final userId = userIdStr != null ? int.parse(userIdStr) : 1; 
+          
+          // Reload incidents with the correct user ID
+          await _incidentService.getUserIncidents(userId);
+          
+          // Also refresh the stats if StatsService is available
+          try {
+            final statsService = Get.find<StatsService>();
+            await statsService.refreshStats();
+          } catch (e) {
+            // Stats service might not be initialized yet, ignore error
+          }
+        } catch (e) {
+          developer.log('Error refreshing incidents after sync', error: e);
         }
       }
       

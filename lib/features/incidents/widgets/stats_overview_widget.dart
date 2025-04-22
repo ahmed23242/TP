@@ -5,8 +5,9 @@ import '../../../core/widgets/custom_text_field.dart';
 
 class StatsOverviewWidget extends StatelessWidget {
   final StatsService statsService = Get.find<StatsService>();
+  final bool isCompact;
 
-  StatsOverviewWidget({Key? key}) : super(key: key);
+  StatsOverviewWidget({Key? key, this.isCompact = false}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

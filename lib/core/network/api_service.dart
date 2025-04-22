@@ -85,10 +85,10 @@ class ApiService extends GetxService {
       
       // Log response body preview
       if (response.body.isNotEmpty) {
-        final bodyPreview = response.body.length > 100 
-            ? response.body.substring(0, 100) + '...' 
-            : response.body;
-        developer.log('API response: ${response.statusCode} - $bodyPreview');
+      final bodyPreview = response.body.length > 100 
+          ? response.body.substring(0, 100) + '...' 
+          : response.body;
+      developer.log('API response: ${response.statusCode} - $bodyPreview');
       }
     } catch (e) {
       // Handle various error types differently

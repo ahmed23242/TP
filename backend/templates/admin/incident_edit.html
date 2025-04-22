@@ -62,8 +62,8 @@ Créer un nouvel incident
                     <div class="row mb-4">
                         <div class="col-md-8">
                             <div class="mb-3">
-                                <label for="{{ form.title.id_for_label }}" class="form-label">Titre</label>
-                                {{ form.title }}
+                                <label for="{{ form.title.id_for_label }}" class="form-label">Titre (Lecture seule)</label>
+                                {{ form.title|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 {% if form.title.errors %}
                                 <div class="text-danger mt-1">{{ form.title.errors }}</div>
                                 {% endif %}
@@ -71,8 +71,8 @@ Créer un nouvel incident
                         </div>
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="{{ form.incident_type.id_for_label }}" class="form-label">Type d'incident</label>
-                                {{ form.incident_type }}
+                                <label for="{{ form.incident_type.id_for_label }}" class="form-label">Type d'incident (Lecture seule)</label>
+                                {{ form.incident_type|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 {% if form.incident_type.errors %}
                                 <div class="text-danger mt-1">{{ form.incident_type.errors }}</div>
                                 {% endif %}
@@ -88,12 +88,13 @@ Créer un nouvel incident
                                 {% if form.status.errors %}
                                 <div class="text-danger mt-1">{{ form.status.errors }}</div>
                                 {% endif %}
+                                <div class="form-text"><strong>Note:</strong> Seul le statut peut être modifié</div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.sync_status.id_for_label }}" class="form-label">Statut de synchronisation</label>
-                                {{ form.sync_status }}
+                                <label for="{{ form.sync_status.id_for_label }}" class="form-label">Statut de synchronisation (Lecture seule)</label>
+                                {{ form.sync_status|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 {% if form.sync_status.errors %}
                                 <div class="text-danger mt-1">{{ form.sync_status.errors }}</div>
                                 {% endif %}
@@ -102,8 +103,8 @@ Créer un nouvel incident
                     </div>
                     
                     <div class="mb-4">
-                        <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
-                        {{ form.description }}
+                        <label for="{{ form.description.id_for_label }}" class="form-label">Description (Lecture seule)</label>
+                        {{ form.description|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                         {% if form.description.errors %}
                         <div class="text-danger mt-1">{{ form.description.errors }}</div>
                         {% endif %}
@@ -112,8 +113,8 @@ Créer un nouvel incident
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.latitude.id_for_label }}" class="form-label">Latitude</label>
-                                {{ form.latitude }}
+                                <label for="{{ form.latitude.id_for_label }}" class="form-label">Latitude (Lecture seule)</label>
+                                {{ form.latitude|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 {% if form.latitude.errors %}
                                 <div class="text-danger mt-1">{{ form.latitude.errors }}</div>
                                 {% endif %}
@@ -121,8 +122,8 @@ Créer un nouvel incident
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.longitude.id_for_label }}" class="form-label">Longitude</label>
-                                {{ form.longitude }}
+                                <label for="{{ form.longitude.id_for_label }}" class="form-label">Longitude (Lecture seule)</label>
+                                {{ form.longitude|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 {% if form.longitude.errors %}
                                 <div class="text-danger mt-1">{{ form.longitude.errors }}</div>
                                 {% endif %}
@@ -131,17 +132,17 @@ Créer un nouvel incident
                     </div>
                     
                     <div class="mb-4">
-                        <label class="form-label">Localisation sur la carte</label>
+                        <label class="form-label">Localisation sur la carte (Lecture seule)</label>
                         <div id="edit-map" style="height: 300px;" class="border rounded"></div>
                         <div class="form-text mt-1">
-                            <i class="fas fa-info-circle"></i> Cliquez sur la carte pour mettre à jour la position de l'incident
+                            <i class="fas fa-info-circle"></i> Visualisation uniquement - La position ne peut pas être modifiée
                         </div>
                     </div>
                     
                     {% if form.user %}
                     <div class="mb-4">
-                        <label for="{{ form.user.id_for_label }}" class="form-label">Utilisateur</label>
-                        {{ form.user }}
+                        <label for="{{ form.user.id_for_label }}" class="form-label">Utilisateur (Lecture seule)</label>
+                        {{ form.user|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                         {% if form.user.errors %}
                         <div class="text-danger mt-1">{{ form.user.errors }}</div>
                         {% endif %}
@@ -149,8 +150,8 @@ Créer un nouvel incident
                     {% endif %}
                     
                     <div class="mb-4">
-                        <label for="{{ form.mobile_id.id_for_label }}" class="form-label">ID Mobile</label>
-                        {{ form.mobile_id }}
+                        <label for="{{ form.mobile_id.id_for_label }}" class="form-label">ID Mobile (Lecture seule)</label>
+                        {{ form.mobile_id|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                         {% if form.mobile_id.errors %}
                         <div class="text-danger mt-1">{{ form.mobile_id.errors }}</div>
                         {% endif %}
@@ -160,42 +161,42 @@ Créer un nouvel incident
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.photo.id_for_label }}" class="form-label">Photo</label>
+                                <label for="{{ form.photo.id_for_label }}" class="form-label">Photo (Lecture seule)</label>
                                 <div class="input-group">
-                                    {{ form.photo }}
-                                    {% if incident.photo %}
-                                    <button type="button" class="btn btn-outline-danger" id="remove-photo-btn">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {% endif %}
+                                    {{ form.photo|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 </div>
                                 {% if form.photo.errors %}
                                 <div class="text-danger mt-1">{{ form.photo.errors }}</div>
                                 {% endif %}
-                                <div class="form-text">Format recommandé: JPG ou PNG, max 5 MB</div>
+                                {% if incident.photo %}
+                                <div class="mt-2">
+                                    <img src="{{ incident.photo.url }}" class="img-fluid img-thumbnail" style="max-height: 200px;" />
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.audio.id_for_label }}" class="form-label">Enregistrement audio</label>
+                                <label for="{{ form.audio.id_for_label }}" class="form-label">Enregistrement audio (Lecture seule)</label>
                                 <div class="input-group">
-                                    {{ form.audio }}
-                                    {% if incident.audio %}
-                                    <button type="button" class="btn btn-outline-danger" id="remove-audio-btn">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {% endif %}
+                                    {{ form.audio|attr:"readonly:readonly"|attr:"disabled:disabled" }}
                                 </div>
                                 {% if form.audio.errors %}
                                 <div class="text-danger mt-1">{{ form.audio.errors }}</div>
                                 {% endif %}
-                                <div class="form-text">Format accepté: MP3, WAV, max 10 MB</div>
+                                {% if incident.voice_note %}
+                                <div class="mt-2">
+                                    <audio controls>
+                                        <source src="{{ incident.voice_note.url }}" type="audio/mpeg">
+                                        Votre navigateur ne supporte pas l'élément audio.
+                                    </audio>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
                     
-                    {{ form.clear_photo }}
-                    {{ form.clear_audio }}
+                    <!-- Removed clear photo and audio options -->
                     
                     <div class="alert alert-info">
                         <div class="d-flex">
@@ -268,9 +269,12 @@ Créer un nouvel incident
 {% endblock %}
 
 {% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialisation de la carte Google Maps
+        // Initialisation de la carte OpenStreetMap
         function initMap() {
             // Utiliser des variables intermédiaires pour éviter les erreurs de linting
             var defaultLat = 48.8566; // Paris par défaut
@@ -289,33 +293,31 @@ Créer un nouvel incident
             var longitude = defaultLng;
             {% endif %}
             
-            const location = { lat: latitude, lng: longitude };
+            const map = L.map('edit-map').setView([latitude, longitude], 15);
             
-            const map = new google.maps.Map(document.getElementById("edit-map"), {
-                zoom: 15,
-                center: location,
-            });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
             
             // Ajouter un marqueur
-            let marker = new google.maps.Marker({
-                position: location,
-                map: map,
+            let marker = L.marker([latitude, longitude], {
                 draggable: true,
-                title: "Position de l'incident",
-            });
+                title: "Position de l'incident"
+            }).addTo(map);
             
             // Mettre à jour les coordonnées lorsqu'on déplace le marqueur
-            google.maps.event.addListener(marker, 'dragend', function() {
-                const latLng = marker.getPosition();
-                document.getElementById('{{ form.latitude.id_for_label }}').value = latLng.lat();
-                document.getElementById('{{ form.longitude.id_for_label }}').value = latLng.lng();
+            marker.on('dragend', function(event) {
+                const latLng = marker.getLatLng();
+                document.getElementById('{{ form.latitude.id_for_label }}').value = latLng.lat;
+                document.getElementById('{{ form.longitude.id_for_label }}').value = latLng.lng;
             });
             
             // Permettre de cliquer sur la carte pour déplacer le marqueur
-            google.maps.event.addListener(map, 'click', function(event) {
-                marker.setPosition(event.latLng);
-                document.getElementById('{{ form.latitude.id_for_label }}').value = event.latLng.lat();
-                document.getElementById('{{ form.longitude.id_for_label }}').value = event.latLng.lng();
+            map.on('click', function(event) {
+                marker.setLatLng(event.latlng);
+                document.getElementById('{{ form.latitude.id_for_label }}').value = event.latlng.lat;
+                document.getElementById('{{ form.longitude.id_for_label }}').value = event.latlng.lng;
             });
             
             // Mettre à jour la carte lorsque les coordonnées sont modifiées manuellement
@@ -336,18 +338,18 @@ Créer un nouvel incident
             lngInput.addEventListener('change', updateMarkerFromInputs);
         }
         
-        // Charger l'API Google Maps
-        if (typeof google === 'object' && typeof google.maps === 'object') {
-            initMap();
-        } else {
-            const script = document.createElement('script');
-            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap";
-            script.async = true;
-            script.defer = true;
-            window.initMap = initMap;
-            document.head.appendChild(script);
-        }
+        // Initialiser la carte directement
+        initMap();
         
+        // Désactiver l'édition si nécessaire
+        if ({{ is_readonly|yesno:"true,false" }}) {
+            // Si on est en mode lecture seule, on désactive le drag du marqueur
+            if (window.marker) {
+                window.marker.dragging.disable();
+                window.map.off('click');
+            }
+        }
+
         // Gestion de l'aperçu de la photo
         const photoInput = document.getElementById('{{ form.photo.id_for_label }}');
         const newPhotoPreview = document.getElementById('new-photo-preview');

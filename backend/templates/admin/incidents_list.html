@@ -7,11 +7,7 @@ Liste des incidents
 {% endblock %}
 
 {% block page_actions %}
-<div class="btn-group">
-    <a href="{% url 'admin_incident_create' %}" class="btn btn-success">
-        <i class="fas fa-plus"></i> Nouvel incident
-    </a>
-</div>
+<!-- Le bouton pour créer un nouvel incident est supprimé -->
 {% endblock %}
 
 {% block content %}
@@ -92,13 +88,20 @@ Liste des incidents
                             </span>
                         </td>
                         <td>
-                            <span class="badge
-                            {% if incident.status == 'pending' %}bg-warning
-                            {% elif incident.status == 'in_progress' %}bg-info
-                            {% elif incident.status == 'resolved' %}bg-success
-                            {% else %}bg-secondary{% endif %}">
-                                {{ incident.get_status_display }}
-                            </span>
+                            <form id="status-form-{{ incident.id }}" method="post" action="{% url 'admin_incident_update_status' incident.id %}">
+                                {% csrf_token %}
+                                <select name="status" class="form-select form-select-sm status-select" data-incident-id="{{ incident.id }}">
+                                    {% for status_key, status_name in status_choices.items %}
+                                    <option value="{{ status_key }}" {% if incident.status == status_key %}selected{% endif %}
+                                        class="{% if status_key == 'pending' %}text-warning
+                                               {% elif status_key == 'in_progress' %}text-info
+                                               {% elif status_key == 'resolved' %}text-success
+                                               {% else %}text-secondary{% endif %}">
+                                        {{ status_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </form>
                         </td>
                         <td>
                             <span class="badge
@@ -114,9 +117,6 @@ Liste des incidents
                             <div class="btn-group btn-group-sm">
                                 <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-primary">
                                     <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-warning">
-                                    <i class="fas fa-edit"></i>
                                 </a>
                             </div>
                         </td>
@@ -134,3 +134,20 @@ Liste des incidents
     </div>
 </div>
 {% endblock %} 
+
+{% block extra_js %}
+<script>
+    // JavaScript to handle status change
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusSelects = document.querySelectorAll('.status-select');
+        
+        statusSelects.forEach(select => {
+            select.addEventListener('change', function() {
+                const incidentId = this.getAttribute('data-incident-id');
+                const form = document.getElementById(`status-form-${incidentId}`);
+                form.submit();
+            });
+        });
+    });
+</script>
+{% endblock %}

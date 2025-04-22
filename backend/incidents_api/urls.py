@@ -10,7 +10,9 @@ from incidents_api.views.admin_views import (
     admin_incident_edit, 
     admin_incidents_list, 
     admin_dashboard,
-    admin_incident_create
+    admin_incident_resolve,
+    admin_incident_delete,
+    admin_incident_update_status
 )
 
 schema_view = get_schema_view(
@@ -34,9 +36,11 @@ urlpatterns = [
     path('', admin_dashboard, name='admin_dashboard'),  # Page d'accueil = tableau de bord
     path('admin-panel/', admin_dashboard, name='admin_dashboard_alt'),  # URL alternative
     path('admin-panel/incidents/', admin_incidents_list, name='admin_incidents_list'),
-    path('admin-panel/incidents/create/', admin_incident_create, name='admin_incident_create'),
     path('admin-panel/incidents/<int:incident_id>/', admin_incident_detail, name='admin_incident_detail'),
     path('admin-panel/incidents/<int:incident_id>/edit/', admin_incident_edit, name='admin_incident_edit'),
+    path('admin-panel/incidents/<int:incident_id>/resolve/', admin_incident_resolve, name='admin_incident_resolve'),
+    path('admin-panel/incidents/<int:incident_id>/delete/', admin_incident_delete, name='admin_incident_delete'),
+    path('admin-panel/incidents/<int:incident_id>/update-status/', admin_incident_update_status, name='admin_incident_update_status'),
     
     # URLs d'authentification Django
     path('accounts/', include('django.contrib.auth.urls')),

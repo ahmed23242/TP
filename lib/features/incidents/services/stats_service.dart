@@ -1,9 +1,15 @@
 import 'package:get/get.dart';
+import 'dart:async';
 import 'dart:developer' as developer;
 import '../../../core/database/database_helper.dart';
+import '../../../core/services/api_service.dart';
+import '../controllers/incident_controller.dart';
 
 class StatsService extends GetxService {
   final _db = DatabaseHelper.instance;
+  final ApiService _apiService = Get.find<ApiService>();
+  Worker? _incidentsWorker;
+  Timer? _autoRefreshTimer;
   
   // Observable statistics
   final RxInt totalIncidents = 0.obs;
@@ -11,13 +17,64 @@ class StatsService extends GetxService {
   final RxInt pendingIncidents = 0.obs;
   final RxMap<String, int> incidentsByType = <String, int>{}.obs;
   final RxBool isLoading = false.obs;
+  final RxList<Map<String, dynamic>> recentIncidents = <Map<String, dynamic>>[].obs;
+  
+  // Status-related statistics (from admin actions)
+  final RxInt resolvedIncidents = 0.obs;
+  final RxInt pendingStatusIncidents = 0.obs;
+  final RxInt inProgressIncidents = 0.obs;
+  final RxDouble resolutionRate = 0.0.obs;
+  
+  // Remote statistics
+  final RxBool isRemoteLoading = false.obs;
+  final RxBool isRemoteStatsAvailable = false.obs;
+  final Rx<Map<String, dynamic>> remoteStats = Rx<Map<String, dynamic>>({});
+  
+  // User dashboard statistics
+  final RxBool isUserStatsLoading = false.obs;
+  final RxBool isUserStatsAvailable = false.obs;
+  final Rx<Map<String, dynamic>> userDashboardStats = Rx<Map<String, dynamic>>({});
+  final RxMap<String, int> incidentsByDay = <String, int>{}.obs;
+  final RxList<Map<String, dynamic>> monthlyTrend = <Map<String, dynamic>>[].obs;
+  
+  // Timestamp of last refresh
+  DateTime? _lastRemoteRefresh;
+  DateTime? _lastUserStatsRefresh;
 
   // Implement async initialization
   Future<StatsService> init() async {
     developer.log('Initializing StatsService');
+    
+    // Set up listener to refresh stats when incidents change
+    _incidentsWorker = ever(Get.find<IncidentController>().incidents, (_) {
+      refreshStats();
+    });
+    
+    // Set up auto-refresh timer for remote stats (every 5 minutes)
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (_apiService.isConnected.value) {
+        fetchRemoteStats();
+        fetchUserDashboardStats();
+      }
+    });
+    
+    // Initial refresh
     await refreshStats();
+    
+    if (_apiService.isConnected.value) {
+      fetchRemoteStats();
+      fetchUserDashboardStats();
+    }
+    
     developer.log('StatsService initialized');
     return this;
+  }
+  
+  @override
+  void onClose() {
+    _incidentsWorker?.dispose();
+    _autoRefreshTimer?.cancel();
+    super.onClose();
   }
 
   Future<void> refreshStats() async {
@@ -36,6 +93,14 @@ class StatsService extends GetxService {
       syncedIncidents.value = incidents.where((inc) => inc['sync_status'] == 'synced').length;
       pendingIncidents.value = incidents.where((inc) => inc['sync_status'] == 'pending').length;
       
+      // Count incidents by status (admin-set status)
+      resolvedIncidents.value = incidents.where((inc) => inc['status'] == 'resolved').length;
+      pendingStatusIncidents.value = incidents.where((inc) => inc['status'] == 'pending').length;
+      inProgressIncidents.value = incidents.where((inc) => inc['status'] == 'in_progress').length;
+      
+      // Calculate resolution rate
+      resolutionRate.value = totalIncidents.value > 0 ? resolvedIncidents.value / totalIncidents.value : 0.0;
+      
       // Count incidents by type
       final typeMap = <String, int>{};
       for (var incident in incidents) {
@@ -43,6 +108,16 @@ class StatsService extends GetxService {
         typeMap[type] = (typeMap[type] ?? 0) + 1;
       }
       incidentsByType.value = typeMap;
+      
+      // Get recent incidents
+      final cutoffDate = DateTime.now().subtract(Duration(days: 7));
+      final recentList = incidents.where((inc) {
+        final createdAt = DateTime.parse(inc['created_at'] as String);
+        return createdAt.isAfter(cutoffDate);
+      }).toList();
+      
+      // Update recent incidents list
+      recentIncidents.value = recentList.map((inc) => Map<String, dynamic>.from(inc)).toList();
       
       developer.log('Statistics refreshed: Total: ${totalIncidents.value}, '
           'Synced: ${syncedIncidents.value}, Pending: ${pendingIncidents.value}');
@@ -74,4 +149,207 @@ class StatsService extends GetxService {
     if (totalIncidents.value == 0) return 0.0;
     return syncedIncidents.value / totalIncidents.value;
   }
-} 
+  
+  // Fetch statistics from the remote API endpoint
+  Future<void> fetchRemoteStats() async {
+    // Skip if we're already loading or if there's no network connection
+    if (isRemoteLoading.value || !_apiService.isConnected.value) {
+      if (!_apiService.isConnected.value) {
+        developer.log('Skipping remote stats fetch: No network connection');
+        isRemoteStatsAvailable.value = false;
+      }
+      return;
+    }
+    
+    // Skip if we've refreshed recently (within last 5 minutes) unless forced
+    if (!shouldRefreshRemoteStats()) {
+      developer.log('Skipping remote stats fetch: Refreshed recently');
+      return;
+    }
+    
+    try {
+      isRemoteLoading.value = true;
+      developer.log('Fetching remote incident statistics from API');
+      
+      // Ensure we have a valid token
+      final token = _apiService.getStoredToken();
+      if (token == null) {
+        developer.log('Cannot fetch remote stats: No authentication token');
+        isRemoteStatsAvailable.value = false;
+        return;
+      }
+      
+      // Make API request to the incidents statistics endpoint
+      final response = await _apiService.get(
+        '${_apiService.incidentsEndpoint}/stats',
+      );
+      
+      if (response.statusCode == 200) {
+        final data = response.data;
+        remoteStats.value = data;
+        isRemoteStatsAvailable.value = true;
+        
+        // Update refresh timestamp
+        _lastRemoteRefresh = DateTime.now();
+        
+        developer.log('Remote statistics fetched successfully');
+      } else {
+        developer.log('Failed to fetch remote statistics: ${response.statusCode}');
+        isRemoteStatsAvailable.value = false;
+      }
+    } catch (e) {
+      developer.log('Error fetching remote statistics', error: e);
+      isRemoteStatsAvailable.value = false;
+    } finally {
+      isRemoteLoading.value = false;
+    }
+  }
+  
+  // Fetch user-focused dashboard statistics from the API endpoint
+  Future<void> fetchUserDashboardStats() async {
+    // Skip if we're already loading or if there's no network connection
+    if (isUserStatsLoading.value || !_apiService.isConnected.value) {
+      if (!_apiService.isConnected.value) {
+        developer.log('Skipping user dashboard stats fetch: No network connection');
+        isUserStatsAvailable.value = false;
+      }
+      return;
+    }
+    
+    // Skip if we've refreshed recently (within last 5 minutes)
+    if (!shouldRefreshUserStats()) {
+      developer.log('Skipping user dashboard stats fetch: Refreshed recently');
+      return;
+    }
+    
+    try {
+      isUserStatsLoading.value = true;
+      developer.log('Fetching user dashboard statistics from API');
+      
+      // Ensure we have a valid token
+      final token = _apiService.getStoredToken();
+      if (token == null) {
+        developer.log('Cannot fetch user stats: No authentication token');
+        isUserStatsAvailable.value = false;
+        return;
+      }
+      
+      // Make API request to the user dashboard statistics endpoint
+      final response = await _apiService.get(
+        '${_apiService.incidentsEndpoint}/user-dashboard',
+      );
+      
+      if (response.statusCode == 200) {
+        final data = response.data;
+        userDashboardStats.value = data;
+        isUserStatsAvailable.value = true;
+        
+        // Extract key metrics
+        final statusSummary = data['status_summary'] ?? {};
+        resolvedIncidents.value = statusSummary['resolved'] ?? 0;
+        pendingStatusIncidents.value = statusSummary['pending'] ?? 0;
+        inProgressIncidents.value = statusSummary['in_progress'] ?? 0;
+        resolutionRate.value = statusSummary['resolution_rate'] ?? 0.0;
+        
+        // Extract daily activity
+        final recentActivity = data['recent_activity'] ?? {};
+        final byDayOfWeek = recentActivity['by_day_of_week'] ?? {};
+        incidentsByDay.value = Map<String, int>.from(byDayOfWeek);
+        
+        // Extract monthly trend
+        final trend = data['monthly_trend'] ?? [];
+        monthlyTrend.value = List<Map<String, dynamic>>.from(trend);
+        
+        // Update refresh timestamp
+        _lastUserStatsRefresh = DateTime.now();
+        
+        developer.log('User dashboard statistics fetched successfully');
+      } else {
+        developer.log('Failed to fetch user dashboard statistics: ${response.statusCode}');
+        isUserStatsAvailable.value = false;
+      }
+    } catch (e) {
+      developer.log('Error fetching user dashboard statistics', error: e);
+      isUserStatsAvailable.value = false;
+    } finally {
+      isUserStatsLoading.value = false;
+    }
+  }
+  
+  // Refresh all statistics (local, remote, and user dashboard)
+  Future<void> refreshAllStats() async {
+    await refreshStats();
+    await fetchRemoteStats();
+    await fetchUserDashboardStats();
+  }
+  
+  // Force refresh of user dashboard statistics
+  Future<void> refreshUserDashboardStats() async {
+    _lastUserStatsRefresh = null; // Force refresh
+    await fetchUserDashboardStats();
+  }
+  
+  // Check if we need to refresh remote stats based on time elapsed
+  bool shouldRefreshRemoteStats() {
+    // If never refreshed, we should refresh
+    if (_lastRemoteRefresh == null) return true;
+    
+    // If more than 5 minutes have passed since last refresh, we should refresh
+    final fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+    return _lastRemoteRefresh!.isBefore(fiveMinutesAgo);
+  }
+  
+  // Check if user stats need refreshing
+  bool shouldRefreshUserStats() {
+    if (_lastUserStatsRefresh == null) return true;
+    
+    final fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+    return _lastUserStatsRefresh!.isBefore(fiveMinutesAgo);
+  }
+  
+  // Get a specific value from user dashboard stats
+  dynamic getUserStatValue(String key) {
+    if (!isUserStatsAvailable.value) return null;
+    
+    final parts = key.split('.');
+    dynamic current = userDashboardStats.value;
+    
+    for (final part in parts) {
+      if (current is! Map) return null;
+      if (!current.containsKey(part)) return null;
+      current = current[part];
+    }
+    
+    return current;
+  }
+  
+  // Get time of last user dashboard refresh
+  String getLastUserStatsRefreshTime() {
+    if (_lastUserStatsRefresh == null) return 'Never';
+    
+    final now = DateTime.now();
+    final difference = now.difference(_lastUserStatsRefresh!);
+    
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+  
+  // Get user activity by day of week
+  Map<String, int> getUserActivityByDayOfWeek() {
+    if (!isUserStatsAvailable.value) return {};
+    return Map<String, int>.from(userDashboardStats.value['recent_activity']?['by_day_of_week'] ?? {});
+  }
+  
+  // Get user activity by hour of day
+  Map<String, int> getUserActivityByHourOfDay() {
+    if (!isUserStatsAvailable.value) return {};
+    return Map<String, int>.from(userDashboardStats.value['recent_activity']?['by_hour_of_day'] ?? {});
+  }
+}

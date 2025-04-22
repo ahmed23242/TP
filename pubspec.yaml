@@ -44,7 +44,7 @@ dependencies:
   # Authentication
   local_auth: ^2.3.0
   jwt_decoder: ^2.0.1
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^9.2.4
   # Location and maps
   google_maps_flutter: ^2.5.3
   geolocator: ^10.1.0
@@ -65,6 +65,9 @@ dependencies:
   connectivity_plus: ^6.1.3
   shared_preferences: ^2.5.3
   percent_indicator: ^4.2.5
+  fl_chart: ^0.71.0
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:

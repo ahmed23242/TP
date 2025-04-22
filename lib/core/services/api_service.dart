@@ -5,6 +5,12 @@ import 'dart:developer' as developer;
 class ApiService extends GetxService {
   late dio.Dio _dio;
   
+  // Add connectivity status
+  final RxBool isConnected = true.obs;
+  
+  // API endpoints
+  String get incidentsEndpoint => 'incidents';
+  
   Future<ApiService> init() async {
     developer.log('Initializing ApiService');
     _dio = dio.Dio(
@@ -27,6 +33,12 @@ class ApiService extends GetxService {
     
     developer.log('ApiService initialized');
     return this;
+  }
+  
+  // Method to get stored authentication token
+  String? getStoredToken() {
+    // Implementation would typically retrieve from secure storage
+    return 'sample_token'; // Placeholder implementation
   }
   
   @override

@@ -8,12 +8,6 @@ Incident #{{ incident.id }} - {{ incident.title }}
 
 {% block page_actions %}
 <div class="btn-group">
-    <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-primary">
-        <i class="fas fa-edit"></i> Modifier
-    </a>
-    <a href="{% url 'admin_incident_sync' incident.id %}" class="btn btn-outline-secondary">
-        <i class="fas fa-sync"></i> Synchroniser
-    </a>
     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
         <i class="fas fa-trash"></i> Supprimer
     </button>
@@ -22,43 +16,48 @@ Incident #{{ incident.id }} - {{ incident.title }}
 
 {% block content %}
 <div class="row">
-    <!-- Colonne d'informations principales -->
     <div class="col-md-8">
-        <!-- Informations de base -->
+        <!-- Information principale -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Informations de l'incident</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">{{ incident.title }}</h5>
+                <div>
+                    <form id="status-form" method="post" action="{% url 'admin_incident_update_status' incident.id %}" class="d-inline-flex align-items-center">
+                        {% csrf_token %}
+                        <label for="status" class="me-2">Statut:</label>
+                        <select name="status" id="status" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('status-form').submit();">
+                            {% for status_key, status_name in incident.STATUS_CHOICES %}
+                            <option value="{{ status_key }}" {% if incident.status == status_key %}selected{% endif %}
+                                class="{% if status_key == 'pending' %}text-warning
+                                       {% elif status_key == 'in_progress' %}text-info
+                                       {% elif status_key == 'resolved' %}text-success
+                                       {% else %}text-secondary{% endif %}">
+                                {{ status_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
             </div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Type d'incident</h6>
-                        <span class="badge 
-                            {% if incident.incident_type == 'accident' %}bg-danger
-                            {% elif incident.incident_type == 'construction' %}bg-warning
-                            {% elif incident.incident_type == 'congestion' %}bg-primary
-                            {% elif incident.incident_type == 'event' %}bg-info
-                            {% elif incident.incident_type == 'hazard' %}bg-secondary
-                            {% else %}bg-dark{% endif %} p-2">
-                            {{ incident.get_incident_type_display }}
-                        </span>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Statut</h6>
-                        <span class="badge 
-                            {% if incident.status == 'pending' %}bg-warning
-                            {% elif incident.status == 'in_progress' %}bg-info
-                            {% elif incident.status == 'resolved' %}bg-success
-                            {% else %}bg-secondary{% endif %} p-2">
-                            {{ incident.get_status_display }}
-                        </span>
-                    </div>
+                <div class="mb-4">
+                    <h6 class="text-muted">Description</h6>
+                    <p>{{ incident.description|linebreaks }}</p>
                 </div>
                 
-                <div class="row mb-3">
+                <div class="row mb-4">
                     <div class="col-md-6">
-                        <h6 class="text-muted">Créé par</h6>
-                        <p>{{ incident.user.username }} ({{ incident.user.email }})</p>
+                        <h6 class="text-muted">Type d'incident</h6>
+                        <p>
+                            <span class="badge
+                            {% if incident.incident_type == 'accident' %}bg-danger
+                            {% elif incident.incident_type == 'fire' %}bg-warning
+                            {% elif incident.incident_type == 'medical' %}bg-info
+                            {% elif incident.incident_type == 'crime' %}bg-dark
+                            {% else %}bg-secondary{% endif %} p-2">
+                                {{ incident.get_incident_type_display }}
+                            </span>
+                        </p>
                     </div>
                     <div class="col-md-6">
                         <h6 class="text-muted">Date de création</h6>
@@ -66,96 +65,50 @@ Incident #{{ incident.id }} - {{ incident.title }}
                     </div>
                 </div>
                 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Dernière mise à jour</h6>
-                        <p>{{ incident.updated_at|date:"d/m/Y H:i" }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-muted">ID Mobile</h6>
-                        <p>{{ incident.mobile_id|default:"Non disponible" }}</p>
-                    </div>
-                </div>
-                
-                <div class="row mb-3">
-                    <div class="col-12">
-                        <h6 class="text-muted">Description</h6>
-                        <div class="p-3 bg-light rounded">
-                            {{ incident.description|linebreaks|default:"Aucune description" }}
+                <div class="mb-4">
+                    <h6 class="text-muted">Utilisateur</h6>
+                    {% if user_info %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nom:</strong> {{ user_info.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Email:</strong> {{ user_info.email }}</p>
                         </div>
                     </div>
+                    <p>
+                        <a href="{% url 'admin:users_user_change' user_info.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-user"></i> Voir le profil
+                        </a>
+                    </p>
+                    {% else %}
+                    <p>Information utilisateur non disponible</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Carte -->
+                <div class="mb-4">
+                    <h6 class="text-muted">Localisation</h6>
+                    {% if incident.latitude and incident.longitude %}
+                        <div id="incident-map" style="height: 300px; width: 100%; border-radius: 8px;"></div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Latitude:</strong> {{ incident.latitude }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Longitude:</strong> {{ incident.longitude }}</p>
+                            </div>
+                        </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Aucune coordonnée géographique disponible.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
         
-        <!-- Emplacement -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Emplacement</h5>
-            </div>
-            <div class="card-body">
-                <div id="incident-map" style="height: 300px; width: 100%;"></div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Latitude</h6>
-                        <p>{{ incident.latitude }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Longitude</h6>
-                        <p>{{ incident.longitude }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
         
-        <!-- Historique de synchronisation -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Historique de synchronisation</h5>
-                <span class="badge 
-                    {% if incident.sync_status == 'pending' %}bg-warning
-                    {% elif incident.sync_status == 'synced' %}bg-success
-                    {% elif incident.sync_status == 'failed' %}bg-danger
-                    {% else %}bg-secondary{% endif %} p-2">
-                    {{ incident.get_sync_status_display }}
-                </span>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-striped mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Date</th>
-                                <th>Statut</th>
-                                <th>Message</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for log in sync_logs %}
-                            <tr>
-                                <td>{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
-                                <td>
-                                    <span class="badge 
-                                        {% if log.status == 'success' %}bg-success
-                                        {% elif log.status == 'error' %}bg-danger
-                                        {% else %}bg-secondary{% endif %}">
-                                        {{ log.get_status_display }}
-                                    </span>
-                                </td>
-                                <td>{{ log.message }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="3" class="text-center py-3">
-                                    Aucun historique de synchronisation disponible
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
     </div>
     
     <!-- Colonne latérale -->
@@ -188,14 +141,14 @@ Incident #{{ incident.id }} - {{ incident.title }}
                 <h5 class="card-title mb-0">Enregistrement audio</h5>
             </div>
             <div class="card-body text-center">
-                {% if incident.audio %}
+                {% if incident.voice_note %}
                 <div class="audio-player">
                     <audio controls class="w-100 mb-3">
-                        <source src="{{ incident.audio.url }}" type="audio/mpeg">
+                        <source src="{{ incident.voice_note.url }}" type="audio/mpeg">
                         Votre navigateur ne supporte pas l'élément audio.
                     </audio>
                 </div>
-                <a href="{{ incident.audio.url }}" download class="btn btn-sm btn-outline-primary">
+                <a href="{{ incident.voice_note.url }}" download class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-download"></i> Télécharger
                 </a>
                 {% else %}
@@ -214,18 +167,16 @@ Incident #{{ incident.id }} - {{ incident.title }}
             </div>
             <div class="card-body">
                 <div class="list-group">
-                    <a href="{% url 'admin_incident_edit' incident.id %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-edit me-2"></i> Modifier l'incident
-                    </a>
-                    <a href="{% url 'admin_incident_sync' incident.id %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-sync me-2"></i> Synchroniser
+                   
+                    <a href="{% url 'admin_incidents_list' %}" class="list-group-item list-group-item-action">
+                        <i class="fas fa-list me-2"></i> Retour à la liste
                     </a>
                     {% if incident.status != 'resolved' %}
                     <a href="{% url 'admin_incident_resolve' incident.id %}" class="list-group-item list-group-item-action">
                         <i class="fas fa-check me-2"></i> Marquer comme résolu
                     </a>
                     {% endif %}
-                    <button type="button" class="list-group-item list-group-item-action list-group-item-danger" 
+                    <button type="button" class="list-group-item list-group-item-action text-danger" 
                             data-bs-toggle="modal" data-bs-target="#deleteModal">
                         <i class="fas fa-trash me-2"></i> Supprimer
                     </button>
@@ -257,39 +208,27 @@ Incident #{{ incident.id }} - {{ incident.title }}
 {% endblock %}
 
 {% block extra_js %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialisation de la carte Google Maps
-        function initMap() {
-            const latitude = {{ incident.latitude }};
-            const longitude = {{ incident.longitude }};
-            const location = { lat: latitude, lng: longitude };
-            
-            const map = new google.maps.Map(document.getElementById("incident-map"), {
-                zoom: 15,
-                center: location,
-            });
-            
-            // Ajouter un marqueur
-            const marker = new google.maps.Marker({
-                position: location,
-                map: map,
-                title: "{{ incident.title }}",
-            });
-        }
+        {% if incident.latitude and incident.longitude %}
+        // Initialisation de la carte OpenStreetMap avec Leaflet
+        const lat = {{ incident.latitude }};
+        const lng = {{ incident.longitude }};
         
-        // Charger l'API Google Maps
-        if (typeof google === 'object' && typeof google.maps === 'object') {
-            initMap();
-        } else {
-            // Load Google Maps API if not already loaded
-            const script = document.createElement('script');
-            script.src = "https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap";
-            script.async = true;
-            script.defer = true;
-            window.initMap = initMap;
-            document.head.appendChild(script);
-        }
+        const map = L.map('incident-map').setView([lat, lng], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        const marker = L.marker([lat, lng]).addTo(map);
+        
+        marker.bindPopup("<strong>{{ incident.title }}</strong><br>{{ incident.description|truncatechars:100 }}").openPopup();
+        {% endif %}
     });
 </script>
-{% endblock %} 
+{% endblock %}

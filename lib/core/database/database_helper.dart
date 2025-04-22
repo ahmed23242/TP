@@ -93,7 +93,7 @@ class DatabaseHelper {
   Future<int> insertUser(Map<String, dynamic> user) async {
     try {
       developer.log('DB: Inserting or updating user: ${user['email']}');
-      final db = await database;
+    final db = await database;
       
       // Check if user already exists
       final existingUser = await getUserByEmail(user['email']);
@@ -102,8 +102,8 @@ class DatabaseHelper {
         // Update existing user
         developer.log('DB: User exists, updating: ${user['email']}');
         await db.update(
-          'users',
-          user,
+      'users',
+      user,
           where: 'email = ?',
           whereArgs: [user['email']],
         );
@@ -125,11 +125,11 @@ class DatabaseHelper {
   Future<Map<String, dynamic>?> getUserByEmail(String email) async {
     try {
       developer.log('DB: Looking up user by email: $email');
-      final db = await database;
-      final results = await db.query(
-        'users',
-        where: 'email = ?',
-        whereArgs: [email],
+    final db = await database;
+    final results = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
       );
       
       if (results.isNotEmpty) {
@@ -148,11 +148,11 @@ class DatabaseHelper {
   Future<Map<String, dynamic>?> getUserById(int id) async {
     try {
       developer.log('DB: Looking up user by ID: $id');
-      final db = await database;
-      final results = await db.query(
-        'users',
-        where: 'id = ?',
-        whereArgs: [id],
+    final db = await database;
+    final results = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
       );
       
       if (results.isNotEmpty) {
@@ -171,7 +171,7 @@ class DatabaseHelper {
   Future<int> insertIncident(Map<String, dynamic> incident) async {
     try {
       developer.log('DB: Inserting incident into local database: ${incident['title']}');
-      final db = await database;
+    final db = await database;
       final id = await db.insert('incidents', incident);
       developer.log('DB: Incident inserted with ID: $id');
       return id;
@@ -184,13 +184,13 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getIncidentsByUserId(int userId) async {
     try {
       developer.log('DB: Fetching incidents for user ID: $userId');
-      final db = await database;
+    final db = await database;
       final incidents = await db.query(
-        'incidents',
-        where: 'user_id = ?',
-        whereArgs: [userId],
-        orderBy: 'created_at DESC',
-      );
+      'incidents',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'created_at DESC',
+    );
       developer.log('DB: Found ${incidents.length} incidents for user $userId');
       return incidents;
     } catch (e) {
@@ -202,11 +202,11 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getUnsyncedIncidents() async {
     try {
       developer.log('DB: Fetching unsynced incidents from database');
-      final db = await database;
+    final db = await database;
       final incidents = await db.query(
-        'incidents',
-        where: 'sync_status = ?',
-        whereArgs: ['pending'],
+      'incidents',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
         orderBy: 'created_at ASC',
       );
       developer.log('DB: Found ${incidents.length} unsynced incidents');
@@ -223,13 +223,13 @@ class DatabaseHelper {
   Future<int> updateIncidentSyncStatus(int incidentId, String syncStatus) async {
     try {
       developer.log('DB: Updating sync status for incident $incidentId to $syncStatus');
-      final db = await database;
+    final db = await database;
       final count = await db.update(
-        'incidents',
+      'incidents',
         {'sync_status': syncStatus},
-        where: 'id = ?',
+      where: 'id = ?',
         whereArgs: [incidentId],
-      );
+    );
       developer.log('DB: Updated sync status for $count incidents');
       return count;
     } catch (e) {

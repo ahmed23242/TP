@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, staff_member_required
 from django.shortcuts import get_object_or_404, render, redirect
 from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from incidents.models import Incident
 from backend.forms import IncidentForm
 
@@ -46,10 +48,34 @@ def admin_incident_edit(request, incident_id):
     incident = get_object_or_404(Incident, id=incident_id)
     
     if request.method == 'POST':
-        form = IncidentForm(request.POST, request.FILES, instance=incident)
+        # Only update the status field
+        original_data = {
+            'title': incident.title,
+            'description': incident.description,
+            'incident_type': incident.incident_type,
+            'latitude': incident.latitude,
+            'longitude': incident.longitude,
+            'sync_status': incident.sync_status,
+            'user': incident.user,
+            # Keep all other fields unchanged
+        }
+        
+        # Create a copy of POST data that we can modify
+        post_data = request.POST.copy()
+        
+        # Apply the original values for all fields except status
+        for field, value in original_data.items():
+            if field in post_data and field != 'status':
+                post_data[field] = value
+        
+        form = IncidentForm(post_data, instance=incident)
+        
         if form.is_valid():
-            form.save()
-            messages.success(request, f"L'incident #{incident.id} a été mis à jour avec succès.")
+            # Only save the status field
+            incident.status = form.cleaned_data['status']
+            incident.save(update_fields=['status'])
+            
+            messages.success(request, f"Le statut de l'incident #{incident.id} a été mis à jour avec succès.")
             return redirect('admin_incident_detail', incident_id=incident.id)
     else:
         form = IncidentForm(instance=incident)
@@ -57,28 +83,33 @@ def admin_incident_edit(request, incident_id):
     return render(request, 'admin/incident_edit.html', {
         'form': form,
         'incident': incident,
+        'is_create': False,  # Ensure template knows this is an edit view
         'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY
-    })
+    }) 
 
 @login_required
 @staff_member_required
-def admin_incident_create(request):
+def admin_incident_update_status(request, incident_id):
+    """
+    View to update incident status directly from the incidents list
+    """
     if request.method == 'POST':
-        form = IncidentForm(request.POST, request.FILES)
-        if form.is_valid():
-            incident = form.save(commit=False)
-            # Si l'utilisateur est connecté, associer l'incident à cet utilisateur
-            if request.user.is_authenticated:
-                incident.user = request.user
-            incident.save()
-            messages.success(request, "L'incident a été créé avec succès.")
-            return redirect('admin_incident_detail', incident_id=incident.id)
-    else:
-        form = IncidentForm(initial={
-            'status': 'pending',
-            'sync_status': 'synced',
-        })
+        incident = get_object_or_404(Incident, id=incident_id)
+        new_status = request.POST.get('status')
+        
+        # Validate that the status is one of the allowed choices
+        valid_statuses = [status[0] for status in Incident.STATUS_CHOICES]
+        
+        if new_status in valid_statuses:
+            # Only update the status field
+            incident.status = new_status
+            incident.save(update_fields=['status'])
+            messages.success(request, f"Le statut de l'incident #{incident.id} a été mis à jour avec succès.")
+        else:
+            messages.error(request, "Statut invalide.")
     
-    return render(request, 'admin/incident_create.html', {
-        'form': form,
-    }) 
+    # Redirect back to the incidents list, preserving any filters
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        return HttpResponseRedirect(referer)
+    return redirect('admin_incidents_list')

@@ -27,33 +27,35 @@ void main() async {
   // Activation du mode test pour éviter les erreurs de navigation sans contexte
   Get.testMode = true;
   
+  // Initialize services and controllers
+  Get.put(PermissionService(), permanent: true);
+  
   try {
-    // Initialisation des services réseau
+    // Initialisation des services réseau (premier niveau de dépendances)
     final connectivityService = await Get.putAsync(() => ConnectivityService().init());
     final apiService = await Get.putAsync(() => ApiService(connectivityService: connectivityService).init());
     
-    // Initialisation des services audio et localisation avant les incidents
+    // Initialisation des services audio et localisation
     final audioService = await Get.putAsync(() => AudioService().init());
     final locationService = await Get.putAsync(() => LocationService().init());
     final navigationService = await Get.putAsync(() => NavigationService().init());
     
-    // Initialisation des services d'authentification
+    // Initialisation des services d'authentification (dépend de ApiService)
     final authService = await Get.putAsync(() => AuthService(apiService: apiService).init());
     
-    // Initialisation des services de gestion des incidents (après AudioService)
+    // Initialisation du service de gestion des incidents
     Get.put(IncidentService(), permanent: true);
+    
+    // Initialisation des contrôleurs qui dépendent des services
+    Get.put(AuthController(), permanent: true);
     
     // Initialisation du service de statistiques
     final statsService = await Get.putAsync(() => StatsService().init());
     
-    // Initialisation du contrôleur d'authentification (après les services)
-    final authController = AuthController();
-    Get.put(authController, permanent: true);
-    
-    // Initialisation des services de synchronisation et de permissions
-    Get.put(SyncService(), permanent: true);
-    final permissionService = PermissionService();
-    Get.put(permissionService, permanent: true);
+    // Initialisation du service de synchronisation
+    // Using Get.put with permanent:true to ensure it's available throughout the app lifecycle
+    final syncService = await SyncService().init();
+    Get.put(syncService, permanent: true);
   } catch (e) {
     print('Error during initialization: $e');
   }

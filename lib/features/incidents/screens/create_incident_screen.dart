@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/incident.dart';
@@ -287,17 +288,32 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 200,
-                        child: GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: _selectedLocation!,
-                            zoom: 15,
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: _selectedLocation!,
+                            initialZoom: 15.0,
                           ),
-                          markers: {
-                            Marker(
-                              markerId: const MarkerId('incident'),
-                              position: _selectedLocation!,
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              subdomains: const ['a', 'b', 'c'],
+                              userAgentPackageName: 'com.accidentsapp',
                             ),
-                          },
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  width: 40.0,
+                                  height: 40.0,
+                                  point: _selectedLocation!,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
