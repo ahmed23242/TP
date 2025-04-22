@@ -1,13 +1,18 @@
 import 'package:get/get.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/database/database_helper.dart';
-import '../../../core/services/api_service.dart';
+import '../../../core/network/api_service.dart';
 import '../controllers/incident_controller.dart';
+import '../../../features/auth/controllers/auth_controller.dart';
 
 class StatsService extends GetxService {
   final _db = DatabaseHelper.instance;
   final ApiService _apiService = Get.find<ApiService>();
+  late final AuthController _authController;
   Worker? _incidentsWorker;
   Timer? _autoRefreshTimer;
   
@@ -45,18 +50,18 @@ class StatsService extends GetxService {
   Future<StatsService> init() async {
     developer.log('Initializing StatsService');
     
-    // Set up listener to refresh stats when incidents change
-    _incidentsWorker = ever(Get.find<IncidentController>().incidents, (_) {
-      refreshStats();
-    });
+    // Get auth controller
+    try {
+      _authController = Get.find<AuthController>();
+    } catch (e) {
+      developer.log('AuthController not found, will be initialized later: $e');
+    }
     
-    // Set up auto-refresh timer for remote stats (every 5 minutes)
-    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      if (_apiService.isConnected.value) {
-        fetchRemoteStats();
-        fetchUserDashboardStats();
-      }
-    });
+    // Set up worker to listen for changes in incidents
+    _setupIncidentsWorker();
+    
+    // Set up auto-refresh timer
+    _setupAutoRefresh();
     
     // Initial refresh
     await refreshStats();
@@ -68,6 +73,27 @@ class StatsService extends GetxService {
     
     developer.log('StatsService initialized');
     return this;
+  }
+  
+  void _setupIncidentsWorker() {
+    try {
+      if (Get.isRegistered<IncidentController>()) {
+        _incidentsWorker = ever(Get.find<IncidentController>().incidents, (_) {
+          refreshStats();
+        });
+      }
+    } catch (e) {
+      developer.log('Error setting up incidents worker: $e');
+    }
+  }
+  
+  void _setupAutoRefresh() {
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (_apiService.isConnected.value) {
+        fetchRemoteStats();
+        fetchUserDashboardStats();
+      }
+    });
   }
   
   @override
@@ -82,8 +108,38 @@ class StatsService extends GetxService {
       isLoading.value = true;
       developer.log('Refreshing incident statistics');
       
-      // Get user ID (using 1 as fallback for testing)
-      final userId = 1; // Should get from auth service in real app
+      // Get user ID from auth controller
+      int userId;
+      try {
+        // Try to get the user ID from the auth controller
+        if (Get.isRegistered<AuthController>()) {
+          _authController = Get.find<AuthController>();
+          final userData = _authController.userData.value;
+          userId = userData?['id'] ?? 0;
+          developer.log('Got user ID from auth controller: $userId');
+        } else {
+          userId = 0;
+          developer.log('AuthController not registered yet');
+        }
+      } catch (e) {
+        userId = 0;
+        developer.log('Error getting user ID: $e');
+      }
+      
+      // If we couldn't get a valid user ID, try to get it from secure storage
+      if (userId == 0) {
+        try {
+          // Try to get user ID from secure storage
+          final storage = const FlutterSecureStorage();
+          final userIdStr = await storage.read(key: 'user_id');
+          if (userIdStr != null && userIdStr.isNotEmpty) {
+            userId = int.tryParse(userIdStr) ?? 0;
+            developer.log('Got user ID from secure storage: $userId');
+          }
+        } catch (e) {
+          developer.log('Error getting user ID from secure storage: $e');
+        }
+      }
       
       // Get all incidents for user
       final incidents = await _db.getIncidentsByUserId(userId);
@@ -171,21 +227,22 @@ class StatsService extends GetxService {
       isRemoteLoading.value = true;
       developer.log('Fetching remote incident statistics from API');
       
-      // Ensure we have a valid token
-      final token = _apiService.getStoredToken();
-      if (token == null) {
-        developer.log('Cannot fetch remote stats: No authentication token');
+      // Check if we're connected to the network
+      if (!_apiService.isConnected.value) {
+        developer.log('Cannot fetch remote stats: No network connection');
         isRemoteStatsAvailable.value = false;
         return;
       }
       
       // Make API request to the incidents statistics endpoint
-      final response = await _apiService.get(
-        '${_apiService.incidentsEndpoint}/stats',
-      );
-      
-      if (response.statusCode == 200) {
-        final data = response.data;
+      try {
+        final response = await http.get(
+          Uri.parse('${ApiService.baseUrl}/incidents/stats'),
+          headers: {'Content-Type': 'application/json'},
+        );
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
         remoteStats.value = data;
         isRemoteStatsAvailable.value = true;
         
@@ -193,8 +250,12 @@ class StatsService extends GetxService {
         _lastRemoteRefresh = DateTime.now();
         
         developer.log('Remote statistics fetched successfully');
-      } else {
-        developer.log('Failed to fetch remote statistics: ${response.statusCode}');
+        } else {
+          developer.log('Failed to fetch remote statistics: ${response.statusCode}');
+          isRemoteStatsAvailable.value = false;
+        }
+      } catch (e) {
+        developer.log('Error making API request: $e');
         isRemoteStatsAvailable.value = false;
       }
     } catch (e) {
@@ -226,21 +287,22 @@ class StatsService extends GetxService {
       isUserStatsLoading.value = true;
       developer.log('Fetching user dashboard statistics from API');
       
-      // Ensure we have a valid token
-      final token = _apiService.getStoredToken();
-      if (token == null) {
-        developer.log('Cannot fetch user stats: No authentication token');
+      // Check if we're connected to the network
+      if (!_apiService.isConnected.value) {
+        developer.log('Cannot fetch user stats: No network connection');
         isUserStatsAvailable.value = false;
         return;
       }
       
       // Make API request to the user dashboard statistics endpoint
-      final response = await _apiService.get(
-        '${_apiService.incidentsEndpoint}/user-dashboard',
-      );
-      
-      if (response.statusCode == 200) {
-        final data = response.data;
+      try {
+        final response = await http.get(
+          Uri.parse('${ApiService.baseUrl}/incidents/user-dashboard'),
+          headers: {'Content-Type': 'application/json'},
+        );
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
         userDashboardStats.value = data;
         isUserStatsAvailable.value = true;
         
@@ -264,8 +326,12 @@ class StatsService extends GetxService {
         _lastUserStatsRefresh = DateTime.now();
         
         developer.log('User dashboard statistics fetched successfully');
-      } else {
-        developer.log('Failed to fetch user dashboard statistics: ${response.statusCode}');
+        } else {
+          developer.log('Failed to fetch user dashboard statistics: ${response.statusCode}');
+          isUserStatsAvailable.value = false;
+        }
+      } catch (e) {
+        developer.log('Error making API request: $e');
         isUserStatsAvailable.value = false;
       }
     } catch (e) {

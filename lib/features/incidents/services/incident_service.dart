@@ -149,17 +149,58 @@ class IncidentService extends GetxController {
 
   Future<List<Incident>> getUserIncidents(int userId) async {
     try {
-      final incidents = await _db.getIncidentsByUserId(userId);
-      this.incidents.value = incidents.map((map) => Incident.fromMap(map)).toList();
-      return this.incidents;
-    } catch (e, stackTrace) {
-      developer.log('Error getting user incidents', error: e, stackTrace: stackTrace);
-      rethrow;
+      developer.log('Getting incidents for user $userId');
+      final dbIncidents = await _db.getIncidentsByUserId(userId);
+      
+      // Convert to Incident objects
+      final incidentsList = dbIncidents.map((map) => Incident.fromMap(map)).toList();
+      
+      // Update the observable list
+      incidents.value = incidentsList;
+      
+      return incidentsList;
+    } catch (e) {
+      developer.log('Error getting user incidents', error: e);
       return [];
     }
   }
-
+  
+  // Get only pending (not synced) incidents
+  Future<List<Incident>> getPendingIncidents() async {
+    try {
+      // Get the current user ID
+      final storage = const FlutterSecureStorage();
+      final userIdStr = await storage.read(key: 'user_id');
+      final userId = userIdStr != null ? int.parse(userIdStr) : 0;
+      
+      if (userId <= 0) {
+        developer.log('No valid user ID found for getting pending incidents');
+        return [];
+      }
+      
+      developer.log('Getting pending incidents for user $userId');
+      final dbIncidents = await _db.getIncidentsByUserId(userId);
+      
+      // Filter to only include pending incidents
+      final pendingIncidents = dbIncidents
+          .where((map) => map['sync_status'] == 'pending')
+          .map((map) => Incident.fromMap(map))
+          .toList();
+      
+      developer.log('Found ${pendingIncidents.length} pending incidents');
+      return pendingIncidents;
+    } catch (e) {
+      developer.log('Error getting pending incidents', error: e);
+      return [];
+    }
+  }
+  
+  // Get unsynced incidents (alias for getPendingIncidents for compatibility)
   Future<List<Incident>> getUnsyncedIncidents() async {
+    return getPendingIncidents();
+  }
+
+  Future<List<Incident>> getUnsyncedIncidentsFromDB() async {
     try {
       final incidents = await _db.getUnsyncedIncidents();
       return incidents.map((map) => Incident.fromMap(map)).toList();

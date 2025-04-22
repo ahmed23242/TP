@@ -67,7 +67,7 @@ Liste des incidents
                         <th>Titre</th>
                         <th>Type</th>
                         <th>Statut</th>
-                        <th>Sync</th>
+                      
                         <th>Date</th>
                         <th>Actions</th>
                     </tr>
@@ -103,15 +103,7 @@ Liste des incidents
                                 </select>
                             </form>
                         </td>
-                        <td>
-                            <span class="badge
-                            {% if incident.sync_status == 'pending' %}bg-warning
-                            {% elif incident.sync_status == 'synced' %}bg-success
-                            {% elif incident.sync_status == 'failed' %}bg-danger
-                            {% else %}bg-secondary{% endif %}">
-                                {{ incident.get_sync_status_display }}
-                            </span>
-                        </td>
+                        
                         <td>{{ incident.created_at|date:"d/m/Y H:i" }}</td>
                         <td>
                             <div class="btn-group btn-group-sm">

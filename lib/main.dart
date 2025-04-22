@@ -10,6 +10,7 @@ import 'features/incidents/screens/map_screen.dart';
 import 'features/incidents/screens/create_incident_screen.dart';
 import 'features/incidents/screens/incident_details_screen.dart';
 import 'features/incidents/screens/incident_history_screen.dart';
+import 'features/incidents/screens/pending_incidents_screen.dart';
 import 'features/auth/controllers/auth_controller.dart';
 import 'features/incidents/services/location_service.dart';
 import 'features/incidents/services/audio_service.dart';
@@ -135,6 +136,13 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/incident/history', 
           page: () => const IncidentHistoryScreen(),
+          binding: BindingsBuilder(() {
+            Get.put(IncidentController());
+          }),
+        ),
+        GetPage(
+          name: '/incident/pending', 
+          page: () => const PendingIncidentsScreen(),
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),

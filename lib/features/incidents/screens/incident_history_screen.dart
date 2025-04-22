@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:math';
 import '../controllers/incident_controller.dart';
 import '../widgets/incident_card.dart';
 import '../models/incident.dart';
 import '../../../core/network/connectivity_service.dart';
+import '../services/sync_service.dart';
 
 class IncidentHistoryScreen extends StatefulWidget {
   const IncidentHistoryScreen({super.key});
@@ -21,6 +23,9 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   final RxString _typeFilter = 'all'.obs;
   final RxString _sortOption = 'date_desc'.obs;
   
+  // Pagination
+  int _currentPage = 0;
+  
   @override
   void initState() {
     super.initState();
@@ -32,6 +37,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   }
   
   List<Incident> _getFilteredIncidents() {
+    // Show all incidents regardless of sync status
     List<Incident> filteredList = List.from(_incidentController.incidents);
     
     // Filtrer par statut
@@ -67,26 +73,22 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Historique des incidents'),
+        title: const Text('Liste des incidents'),
         actions: [
-          Obx(() => _connectivityService.isConnected.value
-            ? const Icon(Icons.wifi, color: Colors.green)
-            : const Icon(Icons.wifi_off, color: Colors.red)
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: _showFilterDialog,
+            tooltip: 'Filtrer',
+          ),
+          IconButton(
+            icon: const Icon(Icons.sort),
+            onPressed: _showSortDialog,
+            tooltip: 'Trier',
           ),
           IconButton(
             icon: const Icon(Icons.sync),
-            tooltip: 'Synchroniser',
-            onPressed: () async {
-              await _incidentController.syncIncidents();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Synchronisation terminée')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: 'Filtrer',
-            onPressed: () => _showFilterBottomSheet(context),
+            onPressed: _syncPendingIncidents,
+            tooltip: 'Synchroniser tous',
           ),
         ],
       ),
@@ -101,50 +103,82 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
           
           if (incidents.isEmpty) {
             return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.6,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, size: 64, color: Colors.amber),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Aucun incident trouvé',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => _incidentController.loadIncidents(),
-                        child: const Text('Actualiser'),
-                      ),
-                      TextButton(
-                        onPressed: () => Get.toNamed('/incident/create'),
-                        child: const Text('Signaler un incident'),
-                      ),
-                    ],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.info_outline, size: 64, color: Colors.blue),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Aucun incident trouvé',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Aucun incident ne correspond à vos critères de recherche',
+                    style: TextStyle(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => Get.toNamed('/incident/create'),
+                    child: const Text('Signaler un incident'),
+                  ),
+                ],
               ),
             );
           }
           
-          return ListView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: incidents.length,
-            itemBuilder: (context, index) {
-              final incident = incidents[index];
-              return IncidentCard(
-                incident: incident,
-                onTap: () => Get.toNamed(
-                  '/incident/details',
-                  arguments: incident,
+          // Add pagination
+          final pageSize = 10; // Number of items per page
+          final totalPages = (incidents.length / pageSize).ceil();
+          final currentPage = _currentPage.clamp(0, totalPages - 1);
+          final startIndex = currentPage * pageSize;
+          final endIndex = min((currentPage + 1) * pageSize, incidents.length);
+          
+          // Get current page items
+          final pageItems = incidents.sublist(startIndex, endIndex);
+          
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: pageItems.length,
+                  itemBuilder: (context, index) {
+                    final incident = pageItems[index];
+                    return IncidentCard(
+                      incident: incident,
+                      onTap: () => Get.toNamed('/incident/details', arguments: incident),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+              // Pagination controls
+              if (totalPages > 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: currentPage > 0
+                            ? () => setState(() => _currentPage--)
+                            : null,
+                      ),
+                      Text('${currentPage + 1} / $totalPages',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: currentPage < totalPages - 1
+                            ? () => setState(() => _currentPage++)
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           );
         }),
       ),
@@ -156,7 +190,67 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
     );
   }
   
-  void _showFilterBottomSheet(BuildContext context) {
+  void _showSortDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Trier par'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('Date (plus récent)'),
+              value: 'date_desc',
+              groupValue: _sortOption.value,
+              onChanged: (value) {
+                _sortOption.value = value!;
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Date (plus ancien)'),
+              value: 'date_asc',
+              groupValue: _sortOption.value,
+              onChanged: (value) {
+                _sortOption.value = value!;
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _syncPendingIncidents() {
+    if (!_connectivityService.isConnected.value) {
+      Get.snackbar(
+        'Synchronisation impossible',
+        'Vérifiez votre connexion internet',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    
+    // Get SyncService and trigger manual sync
+    try {
+      final syncService = Get.find<SyncService>();
+      syncService.manualSync();
+      Get.snackbar(
+        'Synchronisation',
+        'Synchronisation des incidents en cours...',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Erreur',
+        'Impossible de synchroniser: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+  
+  void _showFilterDialog() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // Permet à la feuille de défilement de prendre plus d'espace
@@ -245,36 +339,6 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
                         label: const Text('Danger'),
                         selected: _typeFilter.value == 'danger',
                         onSelected: (selected) => _typeFilter.value = 'danger',
-                      ),
-                    ],
-                  )),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Tri
-                  const Text('Tri:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Obx(() => Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Date ↓'),
-                        selected: _sortOption.value == 'date_desc',
-                        onSelected: (selected) => _sortOption.value = 'date_desc',
-                      ),
-                      ChoiceChip(
-                        label: const Text('Date ↑'),
-                        selected: _sortOption.value == 'date_asc',
-                        onSelected: (selected) => _sortOption.value = 'date_asc',
-                      ),
-                      ChoiceChip(
-                        label: const Text('Statut'),
-                        selected: _sortOption.value == 'status',
-                        onSelected: (selected) => _sortOption.value = 'status',
-                      ),
-                      ChoiceChip(
-                        label: const Text('Type'),
-                        selected: _sortOption.value == 'type',
-                        onSelected: (selected) => _sortOption.value = 'type',
                       ),
                     ],
                   )),

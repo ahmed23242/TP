@@ -54,7 +54,8 @@ class ApiService extends GetxService {
     
     // Schedule endpoint checks after initialization
     Future.delayed(Duration(seconds: 2), () => checkApiEndpoints());
-    Future.delayed(Duration(seconds: 4), () => testRegistrationEndpoint());
+    // Disabled automatic test registration to prevent creating test users
+    // Future.delayed(Duration(seconds: 4), () => testRegistrationEndpoint());
     
     return this;
   }
@@ -406,9 +407,11 @@ class ApiService extends GetxService {
     developer.log('-------- API ENDPOINT CHECK COMPLETE --------');
   }
   
-  // Test registration endpoint with proper fields
+  // Test registration endpoint with proper fields - DISABLED BY DEFAULT
+  // Only call this method manually for testing purposes
   Future<void> testRegistrationEndpoint() async {
     developer.log('-------- TESTING REGISTRATION ENDPOINT --------');
+    developer.log('WARNING: This test creates a new user in the database!');
     
     try {
       developer.log('Testing registration endpoint: $registerEndpoint');

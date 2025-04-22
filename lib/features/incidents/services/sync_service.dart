@@ -50,38 +50,62 @@ class SyncService extends GetxService {
     super.onClose();
   }
   
-  // Set up periodic sync to run every 15 minutes
+  // Set up periodic sync to run more frequently (every 5 minutes)
   void _setupPeriodicSync() {
     _periodicSyncTimer?.cancel();
-    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (_connectivityService.isConnected.value) {
-        developer.log('Running periodic sync (every 15 minutes)');
+        developer.log('Running periodic sync (every 5 minutes)');
         syncPendingIncidents();
       }
     });
   }
   
-  // Configurer l'écouteur de connectivité
+  // Configurer l'écouteur de connectivité avec délai de réessai
   void _setupConnectivityListener() {
     _connectivityWorker = ever(
       _connectivityService.isConnected, 
       (bool isConnected) {
         if (isConnected) {
           developer.log('SyncService: Connection restored, starting auto-sync...');
+          
+          // Sync immediately
           syncPendingIncidents();
+          
+          // Also try again after a short delay in case the first attempt fails
+          Future.delayed(const Duration(seconds: 5), () {
+            if (_connectivityService.isConnected.value) {
+              developer.log('SyncService: Running follow-up sync after connection restored');
+              syncPendingIncidents();
+            }
+          });
         } else {
-          developer.log('SyncService: Connection lost');
+          developer.log('SyncService: Connection lost, sync paused');
         }
-      }
+      },
     );
   }
   
   // Synchroniser les incidents en attente
   Future<void> syncPendingIncidents() async {
     if (isSyncing.value) {
-      developer.log('SyncService: Sync already in progress, skipping');
+      developer.log('Sync already in progress, skipping');
       return;
     }
+    
+    if (!_connectivityService.isConnected.value) {
+      developer.log('No internet connection, skipping sync');
+      return;
+    }
+    
+    // Check if there are any pending incidents before starting sync
+    final pendingIncidents = await _incidentService.getPendingIncidents();
+    if (pendingIncidents.isEmpty) {
+      developer.log('No pending incidents to sync');
+      return;
+    }
+    
+    developer.log('Found ${pendingIncidents.length} pending incidents to sync');
     
     try {
       isSyncing.value = true;

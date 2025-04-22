@@ -18,23 +18,81 @@ class _HomeScreenState extends State<HomeScreen> {
   final IncidentController _incidentController = Get.find<IncidentController>();
   final AuthController _authController = Get.find<AuthController>();
   final ConnectivityService _connectivityService = Get.find<ConnectivityService>();
-  final SyncService _syncService = Get.find<SyncService>();
-  final StatsService _statsService = Get.find<StatsService>();
   
+  // Use nullable variables instead of late to avoid initialization errors
+  SyncService? _syncService;
+  StatsService? _statsService;
+  
+  // Flag to track if services are initialized
+  final RxBool _servicesInitialized = false.obs;
+  final RxBool _isLoading = true.obs;
+  
+  // Method to handle manual synchronization
+  void _syncManually() {
+    if (_connectivityService.isConnected.value && _servicesInitialized.value) {
+      _syncService?.manualSync();
+    } else {
+      Get.snackbar(
+        'Synchronisation impossible',
+        'Vérifiez votre connexion internet',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _incidentController.loadIncidents();
     
-    // Refresh statistics when screen loads
-    _statsService.refreshStats();
-    
-    // Vérifier si nous avons une connexion pour synchoniser automatiquement
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_connectivityService.isConnected.value) {
-        _syncService.syncPendingIncidents();
+    // Initialize services safely
+    _initializeServices();
+  }
+  
+  // Method to safely initialize services
+  Future<void> _initializeServices() async {
+    try {
+      _isLoading.value = true;
+      
+      // Initialize StatsService
+      try {
+        if (!Get.isRegistered<StatsService>()) {
+          final statsService = await StatsService().init();
+          Get.put(statsService, permanent: true);
+        }
+        _statsService = Get.find<StatsService>();
+      } catch (e) {
+        print('Error initializing StatsService: $e');
       }
-    });
+      
+      // Initialize SyncService
+      try {
+        if (!Get.isRegistered<SyncService>()) {
+          final syncService = await SyncService().init();
+          Get.put(syncService, permanent: true);
+        }
+        _syncService = Get.find<SyncService>();
+      } catch (e) {
+        print('Error initializing SyncService: $e');
+      }
+      
+      // Mark services as initialized if both are available
+      if (_statsService != null && _syncService != null) {
+        _servicesInitialized.value = true;
+        
+        // Refresh statistics when services are loaded
+        _statsService?.refreshStats();
+        
+        // Sync if connected
+        if (_connectivityService.isConnected.value) {
+          _syncService?.syncPendingIncidents();
+        }
+      }
+    } catch (e) {
+      print('Error initializing services: $e');
+    } finally {
+      _isLoading.value = false;
+    }
   }
 
   @override
@@ -43,27 +101,56 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Urban Incidents'),
         actions: [
-          Obx(() => Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: _connectivityService.isConnected.value
+          IconButton(
+            icon: Obx(() => _connectivityService.isConnected.value
               ? const Icon(Icons.wifi, color: Colors.green)
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(Icons.wifi_off, color: Colors.red),
-                    Container(
-                      width: 20,
-                      height: 2,
-                      color: Colors.red,
-                      transform: Matrix4.rotationZ(0.785398), // 45 degrés en radians
-                    ),
-                  ],
-                ),
-          )),
+              : const Icon(Icons.wifi_off, color: Colors.red)),
+            onPressed: null,
+            tooltip: 'Statut de connexion',
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Synchroniser',
-            onPressed: () => _syncService.manualSync(),
+            onPressed: _syncManually,
+          ),
+          // Add pending incidents history button
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'Incidents en attente',
+                onPressed: () => Get.toNamed('/incident/pending'),
+              ),
+              // Show badge if there are pending incidents
+              Obx(() {
+                final pendingCount = _statsService?.pendingIncidents.value ?? 0;
+                if (pendingCount > 0) {
+                  return Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$pendingCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                } else {
+                  return const SizedBox.shrink();
+                }
+              }),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -82,10 +169,19 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Obx(() {
-                  if (_statsService.isLoading.value) {
+                  // Show loading indicator if services are initializing or stats are loading
+                  if (_isLoading.value || !_servicesInitialized.value || 
+                      (_statsService != null && _statsService!.isLoading.value)) {
                     return const Center(
                       heightFactor: 1,
                       child: CircularProgressIndicator(),
+                    );
+                  }
+                  
+                  // If services failed to initialize
+                  if (_statsService == null) {
+                    return const Center(
+                      child: Text('Statistics unavailable'),
                     );
                   }
                   
@@ -104,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.refresh),
-                            onPressed: () => _statsService.refreshStats(),
+                            onPressed: () => _statsService?.refreshStats(),
                             tooltip: 'Refresh Stats',
                           ),
                         ],
@@ -116,19 +212,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           _buildStatCard(
                             'Total',
-                            _statsService.totalIncidents.value.toString(),
+                            _statsService?.totalIncidents.value.toString() ?? '0',
                             Icons.assessment,
                             Colors.blue,
                           ),
                           _buildStatCard(
                             'Synced',
-                            _statsService.syncedIncidents.value.toString(),
+                            _statsService?.syncedIncidents.value.toString() ?? '0',
                             Icons.cloud_done,
                             Colors.green,
                           ),
                           _buildStatCard(
                             'Pending',
-                            _statsService.pendingIncidents.value.toString(),
+                            _statsService?.pendingIncidents.value.toString() ?? '0',
                             Icons.cloud_upload,
                             Colors.orange,
                           ),
@@ -138,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 8),
                       
                       // Progress indicator for sync status
-                      if (_statsService.totalIncidents.value > 0)
+                      if (_statsService != null && _statsService!.totalIncidents.value > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Column(
@@ -149,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   const Text('Sync Progress'),
                                   Text(
-                                    '${(_statsService.getSyncCompletionRate() * 100).toStringAsFixed(0)}%',
+                                    '${(_statsService?.getSyncCompletionRate() ?? 0 * 100).toStringAsFixed(0)}%',
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -158,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
-                                  value: _statsService.getSyncCompletionRate(),
+                                  value: _statsService?.getSyncCompletionRate() ?? 0,
                                   backgroundColor: Colors.grey.shade200,
                                   minHeight: 8,
                                 ),
@@ -188,7 +284,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextButton(
                   onPressed: () => Get.toNamed('/incident/history'),
-                  child: const Text('Voir tout'),
+                  child: Row(
+                    children: [
+                      const Text('Voir tout'),
+                      const SizedBox(width: 4),
+                      Obx(() {
+                        final pendingCount = _statsService?.pendingIncidents.value ?? 0;
+                        if (pendingCount > 0) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$pendingCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          );
+                        } else {
+                          return const SizedBox.shrink();
+                        }
+                      }),
+                    ],
+                  ),
                 ),
               ],
             ),
