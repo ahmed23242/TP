@@ -23,6 +23,26 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   final RxString _typeFilter = 'all'.obs;
   final RxString _sortOption = 'date_desc'.obs;
   
+  // Define all possible statuses
+  final List<Map<String, String>> _allStatuses = [
+    {'value': 'all', 'label': 'Tous'},
+    {'value': 'pending', 'label': 'En attente'},
+    {'value': 'in_progress', 'label': 'En cours'},
+    {'value': 'resolved', 'label': 'Résolu'},
+    {'value': 'closed', 'label': 'Fermé'},
+  ];
+  
+  // Define all possible incident types
+  final List<Map<String, String>> _allTypes = [
+    {'value': 'all', 'label': 'Tous'},
+    {'value': 'accident', 'label': 'Accident'},
+    {'value': 'crime', 'label': 'Crime'},
+    {'value': 'fire', 'label': 'Incendie'},
+    {'value': 'general', 'label': 'Général'},
+    {'value': 'medical', 'label': 'Urgence Médicale'},
+    {'value': 'other', 'label': 'Autre'},
+  ];
+  
   // Pagination
   int _currentPage = 0;
   
@@ -37,8 +57,18 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   }
   
   List<Incident> _getFilteredIncidents() {
-    // Show all incidents regardless of sync status
-    List<Incident> filteredList = List.from(_incidentController.incidents);
+    // Get all incidents
+    List<Incident> allIncidents = List.from(_incidentController.incidents);
+    
+    // Separate pending sync incidents
+    List<Incident> pendingSyncIncidents = allIncidents
+        .where((i) => i.syncStatus == 'pending')
+        .toList();
+    
+    // Apply filters to the rest of the incidents
+    List<Incident> filteredList = allIncidents
+        .where((i) => i.syncStatus != 'pending')
+        .toList();
     
     // Filtrer par statut
     if (_statusFilter.value != 'all') {
@@ -49,6 +79,10 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
     if (_typeFilter.value != 'all') {
       filteredList = filteredList.where((i) => i.incidentType == _typeFilter.value).toList();
     }
+    
+    // Combine filtered incidents with pending sync incidents
+    // This ensures newly created incidents are always visible
+    filteredList.addAll(pendingSyncIncidents);
     
     // Trier
     switch (_sortOption.value) {
@@ -73,7 +107,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Liste des incidents'),
+        title: const Text('Incidents'),
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -284,28 +318,11 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
                   const Text('Statut:', style: TextStyle(fontWeight: FontWeight.bold)),
                   Obx(() => Wrap(
                     spacing: 8,
-                    children: [
-                      FilterChip(
-                        label: const Text('Tous'),
-                        selected: _statusFilter.value == 'all',
-                        onSelected: (selected) => _statusFilter.value = 'all',
-                      ),
-                      FilterChip(
-                        label: const Text('En attente'),
-                        selected: _statusFilter.value == 'pending',
-                        onSelected: (selected) => _statusFilter.value = 'pending',
-                      ),
-                      FilterChip(
-                        label: const Text('En cours'),
-                        selected: _statusFilter.value == 'in_progress',
-                        onSelected: (selected) => _statusFilter.value = 'in_progress',
-                      ),
-                      FilterChip(
-                        label: const Text('Terminé'),
-                        selected: _statusFilter.value == 'completed',
-                        onSelected: (selected) => _statusFilter.value = 'completed',
-                      ),
-                    ],
+                    children: _allStatuses.map((status) => FilterChip(
+                      label: Text(status['label']!),
+                      selected: _statusFilter.value == status['value'],
+                      onSelected: (selected) => _statusFilter.value = status['value']!,
+                    )).toList(),
                   )),
                   
                   const SizedBox(height: 16),
@@ -314,33 +331,11 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
                   const Text('Type:', style: TextStyle(fontWeight: FontWeight.bold)),
                   Obx(() => Wrap(
                     spacing: 8,
-                    children: [
-                      FilterChip(
-                        label: const Text('Tous'),
-                        selected: _typeFilter.value == 'all',
-                        onSelected: (selected) => _typeFilter.value = 'all',
-                      ),
-                      FilterChip(
-                        label: const Text('Général'),
-                        selected: _typeFilter.value == 'general',
-                        onSelected: (selected) => _typeFilter.value = 'general',
-                      ),
-                      FilterChip(
-                        label: const Text('Accident'),
-                        selected: _typeFilter.value == 'accident',
-                        onSelected: (selected) => _typeFilter.value = 'accident',
-                      ),
-                      FilterChip(
-                        label: const Text('Incendie'),
-                        selected: _typeFilter.value == 'fire',
-                        onSelected: (selected) => _typeFilter.value = 'fire',
-                      ),
-                      FilterChip(
-                        label: const Text('Danger'),
-                        selected: _typeFilter.value == 'danger',
-                        onSelected: (selected) => _typeFilter.value = 'danger',
-                      ),
-                    ],
+                    children: _allTypes.map((type) => FilterChip(
+                      label: Text(type['label']!),
+                      selected: _typeFilter.value == type['value'],
+                      onSelected: (selected) => _typeFilter.value = type['value']!,
+                    )).toList(),
                   )),
                   
                   const SizedBox(height: 16),
