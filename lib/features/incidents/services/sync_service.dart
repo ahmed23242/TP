@@ -14,6 +14,10 @@ class SyncService extends GetxService {
   Worker? _connectivityWorker;
   Timer? _periodicSyncTimer;
   
+  // Add a lock to prevent multiple syncs from running simultaneously
+  bool _syncLock = false;
+  DateTime? _lastSyncTime;
+  
   final ConnectivityService _connectivityService = Get.find<ConnectivityService>();
   final IncidentService _incidentService = Get.find<IncidentService>();
   final ApiService _apiService = Get.find<ApiService>();
@@ -25,6 +29,7 @@ class SyncService extends GetxService {
     _setupPeriodicSync();
     
     // Try to sync on startup if internet is available
+    // But only do it once, not in both init() and onInit()
     if (_connectivityService.isConnected.value) {
       Future.delayed(const Duration(seconds: 2), () => syncPendingIncidents());
     }
@@ -36,12 +41,13 @@ class SyncService extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    _setupConnectivityListener();
+    // Don't set up connectivity listener twice
+    // _setupConnectivityListener();
     
-    // Vérifier s'il y a des incidents à synchroniser au démarrage
-    if (_connectivityService.isConnected.value) {
-      syncPendingIncidents();
-    }
+    // Don't sync twice at startup
+    // if (_connectivityService.isConnected.value) {
+    //   syncPendingIncidents();
+    // }
   }
   
   @override
@@ -70,12 +76,18 @@ class SyncService extends GetxService {
         if (isConnected) {
           developer.log('SyncService: Connection restored, starting auto-sync...');
           
-          // Only sync once when connection is restored
-          // Use a flag to prevent duplicate syncs
-          if (!isSyncing.value) {
+          // Check if we've synced recently (within the last 10 seconds)
+          final now = DateTime.now();
+          final shouldSync = _lastSyncTime == null || 
+              now.difference(_lastSyncTime!).inSeconds > 10;
+          
+          // Only sync if we haven't synced recently and no sync is in progress
+          if (shouldSync && !_syncLock && !isSyncing.value) {
+            // Set the lock before starting sync
+            _syncLock = true;
             syncPendingIncidents();
           } else {
-            developer.log('SyncService: Sync already in progress, not starting another one');
+            developer.log('SyncService: Sync already in progress or ran recently, skipping');
           }
         } else {
           developer.log('SyncService: Connection lost, sync paused');
@@ -87,15 +99,23 @@ class SyncService extends GetxService {
   // Synchroniser les incidents en attente
   Future<void> syncPendingIncidents() async {
     try {
-      // Avoid running multiple syncs simultaneously
-      if (isSyncing.value) {
-        developer.log('Sync already in progress, skipping');
+      // Record the sync attempt time
+      _lastSyncTime = DateTime.now();
+      
+      // Double-check the lock to prevent multiple syncs
+      if (_syncLock && isSyncing.value) {
+        developer.log('Sync already in progress (lock active), skipping');
         return;
       }
+      
+      // Set syncing flag to true
+      isSyncing.value = true;
       
       // Check for internet connection
       if (!_connectivityService.isConnected.value) {
         developer.log('No internet connection, skipping sync');
+        isSyncing.value = false;
+        _syncLock = false;
         return;
       }
       
@@ -103,13 +123,12 @@ class SyncService extends GetxService {
       final pendingIncidents = await _incidentService.getPendingIncidents();
       if (pendingIncidents.isEmpty) {
         developer.log('No pending incidents to sync');
+        isSyncing.value = false;
+        _syncLock = false;
         return;
       }
       
       developer.log('Found ${pendingIncidents.length} pending incidents to sync');
-      
-      // Set syncing flag to true
-      isSyncing.value = true;
       developer.log('SyncService: ---------- STARTING SYNC OPERATION ----------');
       
       // Vérifier la connectivité avant de commencer
@@ -180,13 +199,17 @@ class SyncService extends GetxService {
         }
       }
       
+      // Reset syncing flag and lock
+      isSyncing.value = false;
+      _syncLock = false;
       developer.log('SyncService: Sync completed - Success: $successCount, Failed: $failCount');
       developer.log('SyncService: ---------- SYNC OPERATION COMPLETED ----------');
     } catch (e) {
-      developer.log('SyncService: Error during sync operation', error: e);
-      developer.log('SyncService: ---------- SYNC OPERATION FAILED ----------');
-    } finally {
+      // Reset syncing flag and lock in case of error
       isSyncing.value = false;
+      _syncLock = false;
+      developer.log('Error during sync operation: $e');
+      developer.log('SyncService: ---------- SYNC OPERATION FAILED ----------');
     }
   }
   

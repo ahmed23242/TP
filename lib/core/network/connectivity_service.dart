@@ -56,9 +56,10 @@ class ConnectivityService extends GetxService {
     developer.log('Connectivity status changed: ${results.map((r) => r.name).join(', ')}, isConnected: ${isConnected.value}');
     
     // Si nous passons de déconnecté à connecté, déclencher l'événement
+    // mais ne pas déclencher de sync directement - laissez SyncService gérer cela
     if (!wasConnected && isConnected.value) {
-      developer.log('Network reconnected - triggering sync');
-      connectivityChangedEvent.toggle(); // Déclencher l'événement
+      developer.log('Network reconnected - connectivity status changed');
+      connectivityChangedEvent.toggle(); // Déclencher l'événement sans mentionner le sync
     }
   }
 
