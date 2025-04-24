@@ -1,18 +1,17 @@
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
-import 'package:permission_handler/permission_handler.dart';
 import '../../../core/database/database_helper.dart';
 import '../models/incident.dart';
-import 'dart:developer' as developer;
-import '../../../core/network/connectivity_service.dart';
 import 'dart:async';
-import 'dart:math';
-import '../../../core/network/api_service.dart';
+import 'dart:developer' as developer;
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/network/connectivity_service.dart';
+import 'stats_service.dart';
 import 'audio_service.dart';
+import 'sync_service.dart';
 import 'package:flutter/material.dart';
 
 class IncidentService extends GetxController {
@@ -133,12 +132,61 @@ class IncidentService extends GetxController {
     }
   }
 
-  // Incident CRUD operations
+  // Create a new incident
   Future<bool> createIncident(Incident incident) async {
     try {
-      await _db.insertIncident(incident.toMap());
-      developer.log('Incident created: ${incident.id}');
-      incidents.add(incident);
+      // Create a new incident with 'pending' sync status
+      final pendingIncident = incident.copyWith(syncStatus: 'pending');
+      
+      // Prepare incident map
+      final incidentMap = pendingIncident.toMap();
+      
+      // Force the sync_status to be 'pending' regardless of what was passed
+      incidentMap['sync_status'] = 'pending';
+      
+      // Ensure additional_media is stored as a JSON string
+      if (incidentMap['additional_media'] != null && incidentMap['additional_media'] is! String) {
+        incidentMap['additional_media'] = jsonEncode(incidentMap['additional_media']);
+      }
+      
+      // Save to database
+      final insertedId = await _db.insertIncident(incidentMap);
+      developer.log('Incident created with ID: $insertedId');
+      
+      // Make sure the incident has the correct ID from the database
+      final updatedIncident = pendingIncident.copyWith(id: insertedId);
+      
+      // Add to the observable list with the correct sync status and ID
+      incidents.add(updatedIncident);
+      developer.log('Added incident to observable list: ${updatedIncident.id}');
+      
+      // Refresh statistics to update the pending count
+      try {
+        if (Get.isRegistered<StatsService>()) {
+          final statsService = Get.find<StatsService>();
+          await statsService.refreshStats();
+          developer.log('Statistics refreshed after creating incident');
+        }
+      } catch (e) {
+        developer.log('Error refreshing statistics: $e');
+        // Continue anyway, this is not critical
+      }
+      
+      // Try to sync the incident immediately if connected to the internet
+      try {
+        if (_connectivityService.isConnected.value) {
+          developer.log('Attempting to sync newly created incident');
+          // Try to get the SyncService and trigger sync
+          if (Get.isRegistered<SyncService>()) {
+            final syncService = Get.find<SyncService>();
+            syncService.syncPendingIncidents();
+          }
+        }
+      } catch (e) {
+        developer.log('Error initiating sync after incident creation: $e');
+        // Continue anyway, this is not critical
+      }
+      
       return true;
     } catch (e, stackTrace) {
       developer.log('Error creating incident', error: e, stackTrace: stackTrace);
@@ -147,28 +195,186 @@ class IncidentService extends GetxController {
     }
   }
 
+  // Get incidents for a specific user
   Future<List<Incident>> getUserIncidents(int userId) async {
     try {
       developer.log('Getting incidents for user $userId');
-      final dbIncidents = await _db.getIncidentsByUserId(userId);
       
-      // Convert to Incident objects
-      final incidentsList = dbIncidents.map((map) => Incident.fromMap(map)).toList();
+      // First, get local incidents from the database
+      final dbIncidents = await _db.getIncidentsByUserId(userId);
+      developer.log('Found ${dbIncidents.length} local incidents in database');
+      
+      // Try to fetch remote incidents from the backend and clean up local database
+      // Only if we have internet connection - this prevents the issue with incidents not appearing when offline
+      if (_connectivityService.isConnected.value) {
+        await fetchRemoteIncidents(userId);
+        developer.log('Fetched remote incidents and updated local database');
+      } else {
+        developer.log('Skipping remote fetch - no internet connection');
+      }
+      
+      // Get updated list of incidents from database (includes both local and remote incidents)
+      final updatedDbIncidents = await _db.getIncidentsByUserId(userId);
+      developer.log('After sync attempt: found ${updatedDbIncidents.length} incidents in database');
+      
+      // Create a map to track unique incident IDs to prevent duplicates
+      // Using a map instead of a set to keep track of the most recent version of each incident
+      final Map<int, Map<String, dynamic>> uniqueIncidentsMap = {};
+      
+      // First pass: collect all incidents by ID
+      for (var map in updatedDbIncidents) {
+        final newMap = Map<String, dynamic>.from(map);
+        final int incidentId = newMap['id'];
+        
+        // If this ID is already in our map, only replace it if this one is newer or has sync_status = 'synced'
+        if (uniqueIncidentsMap.containsKey(incidentId)) {
+          final existingIncident = uniqueIncidentsMap[incidentId]!;
+          final existingSyncStatus = existingIncident['sync_status'];
+          final newSyncStatus = newMap['sync_status'];
+          
+          // Prefer synced incidents over pending ones
+          if (existingSyncStatus == 'pending' && newSyncStatus == 'synced') {
+            uniqueIncidentsMap[incidentId] = newMap;
+          }
+        } else {
+          // This is the first time we're seeing this ID
+          uniqueIncidentsMap[incidentId] = newMap;
+        }
+      }
+      
+      // Convert the map values to a list of Incident objects
+      final List<Incident> uniqueIncidents = [];
+      
+      // Process each unique incident
+      for (var newMap in uniqueIncidentsMap.values) {
+        
+        // Make sure additional_media is properly handled
+        if (newMap['additional_media'] is String) {
+          try {
+            // Try to parse the JSON string
+            newMap['additional_media'] = jsonDecode(newMap['additional_media']);
+          } catch (e) {
+            // If parsing fails, set to empty list
+            newMap['additional_media'] = [];
+          }
+        }
+        
+        // Add to unique incidents list
+        uniqueIncidents.add(Incident.fromMap(newMap));
+      }
+      
+      developer.log('Filtered to ${uniqueIncidents.length} unique incidents');
       
       // Update the observable list
-      incidents.value = incidentsList;
+      incidents.value = uniqueIncidents;
       
-      return incidentsList;
+      return uniqueIncidents;
     } catch (e) {
       developer.log('Error getting user incidents', error: e);
       return [];
     }
   }
   
+  // Fetch incidents from the backend and store them locally
+  Future<void> fetchRemoteIncidents(int userId) async {
+    try {
+      // Check connectivity first
+      if (!_connectivityService.isConnected.value) {
+        developer.log('Cannot fetch remote incidents: No internet connection');
+        return;
+      }
+      
+      developer.log('Fetching remote incidents from backend');
+      
+      // Get the API service
+      final apiService = Get.find<ApiService>();
+      
+      // Check if we have a valid token - use ensureValidToken instead of getStoredToken
+      final token = await apiService.ensureValidToken();
+      if (token == null) {
+        developer.log('Cannot fetch remote incidents: No valid authentication token');
+        return;
+      }
+      
+      // Fetch incidents from the backend
+      final remoteIncidents = await apiService.getUserIncidents();
+      developer.log('Fetched ${remoteIncidents.length} incidents from backend');
+      
+      // Get existing local incidents
+      final localIncidents = await _db.getIncidentsByUserId(userId);
+      final localIncidentIds = localIncidents.map((inc) => inc['id'] as int).toSet();
+      final remoteIncidentIds = remoteIncidents.map((inc) => inc['id'] as int).toSet();
+      
+      // Clean up local database - remove any incidents that don't exist in the backend
+      // except for pending incidents that haven't been synced yet
+      await _cleanupLocalIncidents(userId, localIncidents, remoteIncidentIds);
+      
+      // Process each remote incident
+      int newCount = 0;
+      int updatedCount = 0;
+      
+      for (var remoteIncident in remoteIncidents) {
+        final int remoteId = remoteIncident['id'];
+        
+        // Check if this incident already exists locally
+        if (localIncidentIds.contains(remoteId)) {
+          // Update existing incident
+          await _db.updateIncident(remoteId, {
+            'title': remoteIncident['title'],
+            'description': remoteIncident['description'],
+            'photo_url': remoteIncident['photo_url'],
+            'latitude': remoteIncident['latitude'],
+            'longitude': remoteIncident['longitude'],
+            'status': remoteIncident['status'],
+            'incident_type': remoteIncident['incident_type'],
+            'sync_status': 'synced',
+            // Don't update local paths
+            // Ensure additional_media is properly handled
+            'additional_media': remoteIncident['additional_media'] != null ? 
+                                 (remoteIncident['additional_media'] is String ? 
+                                  remoteIncident['additional_media'] : 
+                                  jsonEncode(remoteIncident['additional_media'])) : 
+                                 '[]',
+          });
+          updatedCount++;
+        } else {
+          // Create new incident record locally
+          final newIncident = {
+            'id': remoteId,
+            'title': remoteIncident['title'],
+            'description': remoteIncident['description'],
+            'photo_path': null,
+            'photo_url': remoteIncident['photo_url'],
+            'voice_note_path': null,
+            'latitude': remoteIncident['latitude'] ?? 0.0,
+            'longitude': remoteIncident['longitude'] ?? 0.0,
+            'created_at': remoteIncident['created_at'],
+            'status': remoteIncident['status'] ?? 'pending',
+            'incident_type': remoteIncident['incident_type'] ?? 'general',
+            'sync_status': 'synced',
+            'user_id': userId,
+            'additional_media': remoteIncident['additional_media'] != null ? 
+                                (remoteIncident['additional_media'] is String ? 
+                                 remoteIncident['additional_media'] : 
+                                 jsonEncode(remoteIncident['additional_media'])) : 
+                                '[]',
+          };
+          
+          await _db.insertIncident(newIncident);
+          newCount++;
+        }
+      }
+      
+      developer.log('Sync complete: Added $newCount new incidents, updated $updatedCount existing incidents');
+    } catch (e) {
+      developer.log('Error fetching remote incidents', error: e);
+    }
+  }
+  
   // Get only pending (not synced) incidents
   Future<List<Incident>> getPendingIncidents() async {
     try {
-      // Get the current user ID
+      // Get current user ID from secure storage
       final storage = const FlutterSecureStorage();
       final userIdStr = await storage.read(key: 'user_id');
       final userId = userIdStr != null ? int.parse(userIdStr) : 0;
@@ -181,14 +387,52 @@ class IncidentService extends GetxController {
       developer.log('Getting pending incidents for user $userId');
       final dbIncidents = await _db.getIncidentsByUserId(userId);
       
-      // Filter to only include pending incidents
-      final pendingIncidents = dbIncidents
-          .where((map) => map['sync_status'] == 'pending')
-          .map((map) => Incident.fromMap(map))
-          .toList();
+      // Debug log to see all incidents and their sync status
+      for (var incident in dbIncidents) {
+        developer.log('DB incident ID: ${incident['id']}, sync_status: ${incident['sync_status']}');
+      }
       
-      developer.log('Found ${pendingIncidents.length} pending incidents');
-      return pendingIncidents;
+      // Create a set to track unique incident IDs to prevent duplicates
+      final Set<int> processedIds = {};
+      final List<Incident> uniquePendingIncidents = [];
+      
+      // Filter to only include pending incidents and ensure no duplicates
+      for (var map in dbIncidents) {
+        // Skip if not pending
+        if (map['sync_status'] != 'pending') {
+          developer.log('Skipping non-pending incident: ${map['id']}');
+          continue;
+        }
+        
+        developer.log('Found pending incident: ${map['id']}');
+        
+        // Create a new map to avoid modifying the original read-only map
+        final newMap = Map<String, dynamic>.from(map);
+        final int incidentId = newMap['id'];
+        
+        // Skip if we've already processed this incident
+        if (processedIds.contains(incidentId)) continue;
+        
+        // Add to processed set
+        processedIds.add(incidentId);
+        
+        // Make sure additional_media is properly handled
+        if (newMap['additional_media'] is String) {
+          try {
+            // Try to parse the JSON string
+            newMap['additional_media'] = jsonDecode(newMap['additional_media']);
+          } catch (e) {
+            // If parsing fails, set to empty list
+            newMap['additional_media'] = [];
+          }
+        }
+        
+        // Add to unique pending incidents list
+        uniquePendingIncidents.add(Incident.fromMap(newMap));
+      }
+      
+      developer.log('Found ${uniquePendingIncidents.length} unique pending incidents');
+      return uniquePendingIncidents;
     } catch (e) {
       developer.log('Error getting pending incidents', error: e);
       return [];
@@ -203,10 +447,42 @@ class IncidentService extends GetxController {
   Future<List<Incident>> getUnsyncedIncidentsFromDB() async {
     try {
       final incidents = await _db.getUnsyncedIncidents();
-      return incidents.map((map) => Incident.fromMap(map)).toList();
+      
+      // Create a set to track unique incident IDs to prevent duplicates
+      final Set<int> processedIds = {};
+      final List<Incident> uniqueUnsyncedIncidents = [];
+      
+      // Process each incident, ensuring no duplicates
+      for (var map in incidents) {
+        // Create a new map to avoid modifying the original read-only map
+        final newMap = Map<String, dynamic>.from(map);
+        final int incidentId = newMap['id'];
+        
+        // Skip if we've already processed this incident
+        if (processedIds.contains(incidentId)) continue;
+        
+        // Add to processed set
+        processedIds.add(incidentId);
+        
+        // Make sure additional_media is properly handled
+        if (newMap['additional_media'] is String) {
+          try {
+            // Try to parse the JSON string
+            newMap['additional_media'] = jsonDecode(newMap['additional_media']);
+          } catch (e) {
+            // If parsing fails, set to empty list
+            newMap['additional_media'] = [];
+          }
+        }
+        
+        // Add to unique incidents list
+        uniqueUnsyncedIncidents.add(Incident.fromMap(newMap));
+      }
+      
+      developer.log('Found ${uniqueUnsyncedIncidents.length} unique unsynced incidents');
+      return uniqueUnsyncedIncidents;
     } catch (e, stackTrace) {
       developer.log('Error getting unsynced incidents', error: e, stackTrace: stackTrace);
-      rethrow;
       return [];
     }
   }
@@ -393,32 +669,57 @@ class IncidentService extends GetxController {
   // Mettre à jour le statut de synchronisation d'un incident
   Future<void> updateIncidentSyncStatus(int incidentId, String syncStatus) async {
     try {
-      await _db.updateIncidentSyncStatus(incidentId, syncStatus);
+      await _db.updateIncident(incidentId, {'sync_status': syncStatus});
       
       // Update the incident in the list if it exists
       final index = incidents.indexWhere((inc) => inc.id == incidentId);
       if (index != -1) {
         final incident = incidents[index];
-        final updatedIncident = Incident(
-          id: incident.id,
-          title: incident.title,
-          description: incident.description,
-          photoPath: incident.photoPath,
-          photoUrl: incident.photoUrl,
-          voiceNotePath: incident.voiceNotePath,
-          latitude: incident.latitude,
-          longitude: incident.longitude,
-          createdAt: incident.createdAt,
-          status: incident.status,
-          incidentType: incident.incidentType,
-          syncStatus: syncStatus,
-          userId: incident.userId,
-        );
+        final updatedIncident = incident.copyWith(syncStatus: syncStatus);
         incidents[index] = updatedIncident;
         incidents.refresh();
       }
       
       developer.log('Updated sync status for incident $incidentId to $syncStatus');
+    } catch (e) {
+      developer.log('Error updating incident sync status', error: e);
+    }
+  }
+  
+  // Clean up local incidents that don't exist in the backend
+  // This helps prevent duplicate incidents and ensures the local database matches the backend
+  Future<void> _cleanupLocalIncidents(int userId, List<Map<String, dynamic>> localIncidents, Set<int> remoteIncidentIds) async {
+    try {
+      developer.log('Starting local database cleanup for user $userId');
+      
+      // Track incidents to remove
+      final List<int> incidentsToRemove = [];
+      
+      // Check each local incident
+      for (var incident in localIncidents) {
+        final int incidentId = incident['id'] as int;
+        final String syncStatus = incident['sync_status'] as String;
+        
+        // Only remove synced incidents that don't exist in the backend
+        // Keep pending incidents even if they don't exist in the backend
+        if (syncStatus == 'synced' && !remoteIncidentIds.contains(incidentId)) {
+          incidentsToRemove.add(incidentId);
+        }
+      }
+      
+      // Remove the identified incidents
+      if (incidentsToRemove.isNotEmpty) {
+        developer.log('Removing ${incidentsToRemove.length} orphaned incidents from local database');
+        
+        for (var incidentId in incidentsToRemove) {
+          await _db.deleteIncident(incidentId);
+          developer.log('Deleted orphaned incident $incidentId');
+        }
+      } else {
+        developer.log('No orphaned incidents found during cleanup');
+      }
+      
+      developer.log('Local database cleanup completed');
     } catch (e, stackTrace) {
       developer.log('Error updating incident sync status', error: e, stackTrace: stackTrace);
       rethrow;

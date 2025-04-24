@@ -806,7 +806,7 @@ The frontend and backend communicate through RESTful API endpoints. Here's the t
 1. Clone the repository
 
 ```bash
-git clone https://github.com/AhmedBouha/accidentsapp.git
+git clone https://github.com/ahmedabddayme3752/accidentsapp.git
 ```
 
 2. Install frontend dependencies

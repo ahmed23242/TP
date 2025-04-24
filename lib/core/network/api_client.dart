@@ -3,11 +3,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:developer' as developer;
 
 class ApiClient {
-  // static const String baseUrl = 'http://10.0.2.2:8000/api'; // For Android Emulator
+  static const String baseUrl = 'http://10.0.2.2:8000/api'; // For Android Emulator
   // static const String baseUrl = 'http://172.20.10.18:8000/api'; // Adresse IP de l'ordinateur
   
   // Adresse IP Wi-Fi de l'ordinateur (d'après la commande ipconfig)
-  static const String baseUrl = 'http://172.20.10.18:8000/api';
+ // static const String baseUrl = 'http://172.20.10.18:8000/api';
   
   final Dio _dio = Dio();
   final _storage = const FlutterSecureStorage();

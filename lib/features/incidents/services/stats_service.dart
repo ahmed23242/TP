@@ -143,11 +143,39 @@ class StatsService extends GetxService {
       
       // Get all incidents for user
       final incidents = await _db.getIncidentsByUserId(userId);
-      totalIncidents.value = incidents.length;
+      
+      // Create a map to track unique incident IDs to prevent duplicates in statistics
+      final Map<int, Map<String, dynamic>> uniqueIncidentsMap = {};
+      
+      // First pass: collect all incidents by ID
+      for (var incident in incidents) {
+        final int incidentId = incident['id'] as int;
+        final String syncStatus = incident['sync_status'] as String;
+        
+        // If this ID is already in our map, only replace it if this one is newer or has sync_status = 'synced'
+        if (uniqueIncidentsMap.containsKey(incidentId)) {
+          final existingIncident = uniqueIncidentsMap[incidentId]!;
+          final existingSyncStatus = existingIncident['sync_status'];
+          
+          // Prefer synced incidents over pending ones
+          if (existingSyncStatus == 'pending' && syncStatus == 'synced') {
+            uniqueIncidentsMap[incidentId] = incident;
+          }
+        } else {
+          // This is the first time we're seeing this ID
+          uniqueIncidentsMap[incidentId] = incident;
+        }
+      }
+      
+      // Use the unique incidents for statistics
+      final uniqueIncidents = uniqueIncidentsMap.values.toList();
+      totalIncidents.value = uniqueIncidents.length;
       
       // Count synced vs pending incidents
-      syncedIncidents.value = incidents.where((inc) => inc['sync_status'] == 'synced').length;
-      pendingIncidents.value = incidents.where((inc) => inc['sync_status'] == 'pending').length;
+      syncedIncidents.value = uniqueIncidents.where((inc) => inc['sync_status'] == 'synced').length;
+      pendingIncidents.value = uniqueIncidents.where((inc) => inc['sync_status'] == 'pending').length;
+      
+      developer.log('Statistics refreshed: Total: ${totalIncidents.value}, Synced: ${syncedIncidents.value}, Pending: ${pendingIncidents.value}');
       
       // Count incidents by status (admin-set status)
       resolvedIncidents.value = incidents.where((inc) => inc['status'] == 'resolved').length;

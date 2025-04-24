@@ -1,13 +1,19 @@
 from rest_framework import serializers
-from .models import Incident
+from .models import Incident, IncidentMedia
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+class IncidentMediaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncidentMedia
+        fields = ('id', 'media_file', 'media_type', 'caption', 'created_at')
 
 class IncidentSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     photo_url = serializers.SerializerMethodField()
     voice_note_url = serializers.SerializerMethodField()
+    additional_media = IncidentMediaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Incident
@@ -15,7 +21,7 @@ class IncidentSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'incident_type', 'photo', 'photo_url',
             'photo_path', 'voice_note', 'voice_note_url', 'voice_note_path', 
             'latitude', 'longitude', 'status', 'created_at', 'updated_at', 
-            'user', 'sync_status'
+            'user', 'sync_status', 'additional_media'
         )
         read_only_fields = ('id', 'updated_at')
 

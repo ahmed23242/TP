@@ -184,7 +184,7 @@ class IncidentController extends GetxController {
       developer.log('Checking authentication token validity');
       final validToken = await apiService.ensureValidToken();
       
-      if (!validToken) {
+      if (validToken == null) {
         developer.log('No valid token available, prompting for login');
         isLoading.value = false;
         promptReLogin();

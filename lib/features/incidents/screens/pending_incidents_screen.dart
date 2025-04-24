@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:math';
 import '../controllers/incident_controller.dart';
 import '../widgets/incident_card.dart';
 import '../models/incident.dart';
@@ -16,6 +17,9 @@ class PendingIncidentsScreen extends StatefulWidget {
 class _PendingIncidentsScreenState extends State<PendingIncidentsScreen> {
   final IncidentController _incidentController = Get.find<IncidentController>();
   final ConnectivityService _connectivityService = Get.find<ConnectivityService>();
+  
+  // Pagination
+  int _currentPage = 0;
   
   @override
   void initState() {
@@ -104,16 +108,57 @@ class _PendingIncidentsScreenState extends State<PendingIncidentsScreen> {
           );
         }
         
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: pendingIncidents.length,
-          itemBuilder: (context, index) {
-            final incident = pendingIncidents[index];
-            return IncidentCard(
-              incident: incident,
-              onTap: () => Get.toNamed('/incident/details', arguments: incident),
-            );
-          },
+        // Add pagination
+        final pageSize = 5; // Number of items per page
+        final totalPages = (pendingIncidents.length / pageSize).ceil();
+        final currentPage = _currentPage.clamp(0, totalPages - 1);
+        final startIndex = currentPage * pageSize;
+        final endIndex = min((currentPage + 1) * pageSize, pendingIncidents.length);
+        
+        // Get current page items
+        final pageItems = pendingIncidents.sublist(startIndex, endIndex);
+        
+        return Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: pageItems.length,
+                itemBuilder: (context, index) {
+                  final incident = pageItems[index];
+                  return IncidentCard(
+                    incident: incident,
+                    onTap: () => Get.toNamed('/incident/details', arguments: incident),
+                  );
+                },
+              ),
+            ),
+            // Pagination controls
+            if (totalPages > 1)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                color: Theme.of(context).colorScheme.surface,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: currentPage > 0
+                          ? () => setState(() => _currentPage--)
+                          : null,
+                    ),
+                    Text('${currentPage + 1} / $totalPages',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: currentPage < totalPages - 1
+                          ? () => setState(() => _currentPage++)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+          ],
         );
       }),
     );

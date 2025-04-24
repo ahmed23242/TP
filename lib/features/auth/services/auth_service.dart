@@ -313,15 +313,37 @@ class AuthService extends GetxController {
             
             // Also save to local database as backup
             developer.log('Saving user to local database');
-            await _db.insertUser({
-              'id': int.parse(userId),
-              'email': email,
-              'password': password,
-              'phone': phone,
-              'role': 'user',
-              'token': response['access'],
-              'last_login': DateTime.now().toIso8601String(),
-            });
+            try {
+              // First check if user already exists in local DB
+              final existingUser = await _db.getUserByEmail(email);
+              
+              if (existingUser != null) {
+                // Update existing user
+                developer.log('User already exists in local DB, updating');
+                await _db.updateUser(int.parse(userId), {
+                  'email': email,
+                  'password': password,
+                  'phone': phone,
+                  'role': 'user',
+                  'token': response['access'],
+                  'last_login': DateTime.now().toIso8601String(),
+                });
+              } else {
+                // Insert new user
+                await _db.insertUser({
+                  'id': int.parse(userId),
+                  'email': email,
+                  'password': password,
+                  'phone': phone,
+                  'role': 'user',
+                  'token': response['access'],
+                  'last_login': DateTime.now().toIso8601String(),
+                });
+              }
+            } catch (dbError) {
+              developer.log('Error saving user to local database', error: dbError);
+              // Continue anyway since we have the user in the backend
+            }
             
             developer.log('Registration completed successfully');
             developer.log('-------- REGISTRATION PROCESS COMPLETED --------');

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:get/get.dart';
 import 'dart:developer' as developer;
+import 'dart:convert';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/network/api_service.dart';
 import '../models/incident.dart';
@@ -61,7 +62,7 @@ class SyncService extends GetxService {
     });
   }
   
-  // Configurer l'écouteur de connectivité avec délai de réessai
+  // Configurer l'écouteur de connectivité
   void _setupConnectivityListener() {
     _connectivityWorker = ever(
       _connectivityService.isConnected, 
@@ -69,16 +70,13 @@ class SyncService extends GetxService {
         if (isConnected) {
           developer.log('SyncService: Connection restored, starting auto-sync...');
           
-          // Sync immediately
-          syncPendingIncidents();
-          
-          // Also try again after a short delay in case the first attempt fails
-          Future.delayed(const Duration(seconds: 5), () {
-            if (_connectivityService.isConnected.value) {
-              developer.log('SyncService: Running follow-up sync after connection restored');
-              syncPendingIncidents();
-            }
-          });
+          // Only sync once when connection is restored
+          // Use a flag to prevent duplicate syncs
+          if (!isSyncing.value) {
+            syncPendingIncidents();
+          } else {
+            developer.log('SyncService: Sync already in progress, not starting another one');
+          }
         } else {
           developer.log('SyncService: Connection lost, sync paused');
         }
@@ -88,26 +86,29 @@ class SyncService extends GetxService {
   
   // Synchroniser les incidents en attente
   Future<void> syncPendingIncidents() async {
-    if (isSyncing.value) {
-      developer.log('Sync already in progress, skipping');
-      return;
-    }
-    
-    if (!_connectivityService.isConnected.value) {
-      developer.log('No internet connection, skipping sync');
-      return;
-    }
-    
-    // Check if there are any pending incidents before starting sync
-    final pendingIncidents = await _incidentService.getPendingIncidents();
-    if (pendingIncidents.isEmpty) {
-      developer.log('No pending incidents to sync');
-      return;
-    }
-    
-    developer.log('Found ${pendingIncidents.length} pending incidents to sync');
-    
     try {
+      // Avoid running multiple syncs simultaneously
+      if (isSyncing.value) {
+        developer.log('Sync already in progress, skipping');
+        return;
+      }
+      
+      // Check for internet connection
+      if (!_connectivityService.isConnected.value) {
+        developer.log('No internet connection, skipping sync');
+        return;
+      }
+      
+      // Check if there are any pending incidents before starting sync
+      final pendingIncidents = await _incidentService.getPendingIncidents();
+      if (pendingIncidents.isEmpty) {
+        developer.log('No pending incidents to sync');
+        return;
+      }
+      
+      developer.log('Found ${pendingIncidents.length} pending incidents to sync');
+      
+      // Set syncing flag to true
       isSyncing.value = true;
       developer.log('SyncService: ---------- STARTING SYNC OPERATION ----------');
       
@@ -121,14 +122,14 @@ class SyncService extends GetxService {
         return;
       }
       
-      // Verify authentication
-      final token = await _apiService.getStoredToken();
+      // Verify authentication - use ensureValidToken to get a valid token
+      final token = await _apiService.ensureValidToken();
       if (token == null) {
-        developer.log('SyncService: No authentication token found, skipping sync');
+        developer.log('SyncService: No valid authentication token found, skipping sync');
         isSyncing.value = false;
         return;
       }
-      developer.log('SyncService: Authentication token found, proceeding with sync');
+      developer.log('SyncService: Valid authentication token found, proceeding with sync');
       
       // Récupérer les incidents non synchronisés
       final unsyncedIncidents = await _incidentService.getUnsyncedIncidents();
@@ -215,13 +216,20 @@ class SyncService extends GetxService {
         'status': 'pending',
         'sync_status': 'pending',
         'user': incident.userId, // Make sure to include the user ID for the API
+        // Convert additional_media to JSON string if it's not empty
+        'additional_media': incident.additionalMedia.isEmpty ? '[]' : jsonEncode(incident.additionalMedia),
       };
       
       developer.log('SyncService: Incident data prepared for API: $incidentData');
       
-      // Get authentication token
-      final token = await _apiService.getStoredToken();
+      // Get a valid authentication token using ensureValidToken
+      final token = await _apiService.ensureValidToken();
       developer.log('SyncService: Using auth token: ${token != null ? 'valid token exists' : 'token is null'}');
+      
+      if (token == null) {
+        developer.log('SyncService: Failed to sync incident ${incident.id} - Invalid or missing token');
+        throw Exception('Invalid or missing authentication token');
+      }
       
       // Check connectivity again before API call
       final isConnected = await _connectivityService.checkConnectivity();

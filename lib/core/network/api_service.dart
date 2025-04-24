@@ -41,6 +41,8 @@ class ApiService extends GetxService {
       if (connected) {
         developer.log('ApiService: Connectivity restored, checking API status');
         _checkConnection();
+        // We'll let SyncService handle the actual sync process
+        // and not trigger it from here to avoid double syncing
       } else {
         developer.log('ApiService: Connectivity lost');
         isConnected.value = false;
@@ -108,29 +110,67 @@ class ApiService extends GetxService {
   
   // Méthode pour obtenir les en-têtes d'authentification
   Future<Map<String, String>> _getAuthHeaders() async {
-    final token = await _storage.read(key: 'jwt_token');
+    // Always try to get a valid token first
+    final token = await ensureValidToken();
     developer.log('Using JWT token: ${token != null ? "Valid token present" : "Token is null"}');
     
-    return {
+    final headers = {
       'Content-Type': 'application/json',
-      'Authorization': token != null ? 'Bearer $token' : '',
     };
+    
+    // Only add Authorization header if token exists
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    
+    return headers;
   }
   
-  // Méthode pour vérifier et rafraîchir le token si nécessaire
+  // Méthode pour obtenir un token valide
   Future<String?> _getValidToken() async {
     try {
       final token = await _storage.read(key: 'jwt_token');
       if (token == null) return null;
       
-      // Vérifier si le token est expiré (implémentation simplifiée)
-      // Dans une application réelle, il faudrait décoder le JWT et vérifier la date d'expiration
-      
-      // Pour cet exemple, nous supposons juste que le token est valide
+      // For simplicity, just return the token
+      // The ensureValidToken method handles actual token refresh
       return token;
     } catch (e) {
       developer.log('Error getting valid token: $e');
       return null;
+    }
+  }
+  
+  // Method to refresh the token if needed
+  Future<bool> _refreshToken() async {
+    try {
+      final refreshToken = await _storage.read(key: 'refresh_token');
+      if (refreshToken == null) {
+        developer.log('No refresh token available');
+        return false;
+      }
+      
+      developer.log('Attempting to refresh token');
+      final response = await http.post(
+        Uri.parse(tokenRefreshEndpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': refreshToken}),
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final newToken = responseData['access'];
+        
+        await _storage.write(key: 'jwt_token', value: newToken);
+        developer.log('Token refreshed successfully');
+        return true;
+      } else {
+        developer.log('Failed to refresh token: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      developer.log('Error refreshing token: $e');
+      return false;
     }
   }
   
@@ -237,9 +277,17 @@ class ApiService extends GetxService {
       developer.log('Get user profile response status code: ${response.statusCode}');
       
       if (response.statusCode == 200) {
-        final userData = jsonDecode(response.body);
+        final dynamic userData = jsonDecode(response.body);
         developer.log('User profile fetched successfully: $userData');
-        return userData;
+        
+        // Handle both list and map response formats
+        if (userData is List && userData.isNotEmpty) {
+          return userData[0] as Map<String, dynamic>;
+        } else if (userData is Map<String, dynamic>) {
+          return userData;
+        } else {
+          throw Exception('Unexpected user profile format');
+        }
       } else {
         developer.log('Failed to get user profile with status: ${response.statusCode}, body: ${response.body}');
         throw Exception('Failed to get user profile: ${response.body}');
@@ -285,7 +333,8 @@ class ApiService extends GetxService {
   // Méthode pour obtenir les incidents d'un utilisateur
   Future<List<Map<String, dynamic>>> getUserIncidents() async {
     try {
-      final token = await _getValidToken();
+      // Try to refresh token first to ensure it's valid
+      final token = await ensureValidToken();
       if (token == null) {
         throw Exception('Not authenticated');
       }
@@ -315,7 +364,8 @@ class ApiService extends GetxService {
   // Méthode pour synchroniser un incident
   Future<Map<String, dynamic>> syncIncident(Map<String, dynamic> incidentData) async {
     try {
-      final token = await _getValidToken();
+      // Always ensure we have a valid token before making the request
+      final token = await ensureValidToken();
       if (token == null) {
         developer.log('Sync failed: Not authenticated (token is null)');
         throw Exception('Not authenticated');
@@ -327,15 +377,18 @@ class ApiService extends GetxService {
         throw Exception('No internet connection');
       }
       
+      // Get the authentication headers with the valid token
+      final headers = await _getAuthHeaders();
+      
       developer.log('Attempting to sync incident to: ${incidentsEndpoint}');
-      developer.log('Sync with headers: ${await _getAuthHeaders()}');
+      developer.log('Sync with headers: $headers');
       developer.log('With data: ${jsonEncode(incidentData)}');
       
       // Pour l'envoi de fichiers, il faudrait utiliser multipart/form-data
       // Mais pour simplifier, nous utiliserons juste application/json
       final response = await http.post(
         Uri.parse(incidentsEndpoint),
-        headers: await _getAuthHeaders(),
+        headers: headers,
         body: jsonEncode(incidentData),
       );
       
@@ -471,79 +524,66 @@ class ApiService extends GetxService {
     developer.log('-------- REGISTRATION ENDPOINT TEST COMPLETE --------');
   }
   
-  // Method to check and ensure valid token (for debugging)
-  Future<bool> ensureValidToken() async {
+  // Method to check and ensure valid token
+  Future<String?> ensureValidToken() async {
     try {
       developer.log('-------- CHECKING TOKEN VALIDITY --------');
       final token = await _storage.read(key: 'jwt_token');
-      
+      developer.log('Retrieved token from storage');
       if (token == null) {
         developer.log('No token found in secure storage');
-        return false;
+        return null;
       }
       
       developer.log('Token found in secure storage: ${token.substring(0, min(10, token.length))}...');
       
+      // Check if token is "local_auth" (offline mode)
+      if (token.startsWith('local_auth')) {
+        developer.log('Using local auth token, cannot refresh');
+        return token;
+      }
+      
       // Make a request to test the token
       try {
         final response = await http.get(
-          Uri.parse(userProfileEndpoint),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
+          Uri.parse('$baseUrl/users/profile/'),
+          headers: {'Authorization': 'Bearer $token'},
         );
-        
-        developer.log('Token test response status: ${response.statusCode}');
         
         if (response.statusCode == 200) {
           developer.log('Token is valid!');
-          return true;
+          developer.log('-------- TOKEN CHECK COMPLETE --------');
+          return token;
         } else if (response.statusCode == 401) {
           developer.log('Token is expired or invalid, attempting to refresh');
           
-          // Attempt to refresh the token
-          final refreshToken = await _storage.read(key: 'refresh_token');
-          if (refreshToken != null) {
-            try {
-              final refreshResponse = await http.post(
-                Uri.parse(tokenRefreshEndpoint),
-                headers: {'Content-Type': 'application/json'},
-                body: jsonEncode({'refresh': refreshToken}),
-              );
-              
-              if (refreshResponse.statusCode == 200) {
-                final refreshData = jsonDecode(refreshResponse.body);
-                final newToken = refreshData['access'];
-                
-                // Store the new token
-                await _storage.write(key: 'jwt_token', value: newToken);
-                developer.log('Token successfully refreshed and stored');
-                return true;
-              } else {
-                developer.log('Failed to refresh token: ${refreshResponse.statusCode}');
-              }
-            } catch (e) {
-              developer.log('Error refreshing token', error: e);
-            }
+          // Try to refresh the token
+          final refreshed = await _refreshToken();
+          if (refreshed) {
+            // Get the new token
+            final newToken = await _storage.read(key: 'jwt_token');
+            developer.log('Token refreshed successfully');
+            developer.log('-------- TOKEN CHECK COMPLETE --------');
+            return newToken;
           } else {
-            developer.log('No refresh token available');
+            developer.log('Failed to refresh token');
+            developer.log('-------- TOKEN CHECK FAILED --------');
+            return null;
           }
-          
-          return false;
         } else {
-          developer.log('Unexpected response checking token: ${response.statusCode}');
-          return false;
+          developer.log('Unexpected status code when checking token: ${response.statusCode}');
+          developer.log('-------- TOKEN CHECK COMPLETE WITH WARNING --------');
+          return token; // Return the token anyway, might work for other endpoints
         }
       } catch (e) {
-        developer.log('Error testing token', error: e);
-        return false;
+        developer.log('Error checking token validity', error: e);
+        developer.log('-------- TOKEN CHECK ERROR --------');
+        return token; // Return the token anyway in case of network error
       }
     } catch (e) {
-      developer.log('Error checking token validity', error: e);
-      return false;
-    } finally {
-      developer.log('-------- TOKEN CHECK COMPLETE --------');
+      developer.log('Error in ensureValidToken', error: e);
+      developer.log('-------- TOKEN CHECK FAILED --------');
+      return null;
     }
   }
-} 
+}

@@ -129,7 +129,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
           }
           
           // Add pagination
-          final pageSize = 10; // Number of items per page
+          final pageSize = 5; // Number of items per page
           final totalPages = (incidents.length / pageSize).ceil();
           final currentPage = _currentPage.clamp(0, totalPages - 1);
           final startIndex = currentPage * pageSize;
