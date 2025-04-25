@@ -3,15 +3,108 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:just_audio/just_audio.dart';
 import '../models/incident.dart';
 import '../../auth/controllers/auth_controller.dart';
 import "package:timeago/timeago.dart" as timeago;
 
-class IncidentDetailsScreen extends StatelessWidget {
-  final Incident incident = Get.arguments;
-  final AuthController authController = Get.find<AuthController>();
+class IncidentDetailsScreen extends StatefulWidget {
+  const IncidentDetailsScreen({super.key});
 
-  IncidentDetailsScreen({super.key});
+  @override
+  State<IncidentDetailsScreen> createState() => _IncidentDetailsScreenState();
+}
+
+class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
+  late final Incident incident;
+  late final AuthController authController;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  
+  @override
+  void initState() {
+    super.initState();
+    incident = Get.arguments;
+    authController = Get.find<AuthController>();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  // Format duration to mm:ss
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
+  }
+
+  // Play or pause audio
+  Future<void> _playPause(String path) async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+      setState(() {
+        _isPlaying = false;
+      });
+    } else {
+      try {
+        // Check if we need to load a new audio file
+        if (_audioPlayer.audioSource == null || 
+            (_audioPlayer.audioSource as AudioSource).toString() != path) {
+          await _audioPlayer.setFilePath(path);
+          
+          // Listen to player state changes
+          _audioPlayer.playerStateStream.listen((state) {
+            if (state.processingState == ProcessingState.completed) {
+              setState(() {
+                _isPlaying = false;
+                // Réinitialiser la position mais s'assurer qu'elle ne dépasse pas la durée
+                _position = Duration.zero;
+              });
+              // Réinitialiser le lecteur pour éviter les problèmes lors de la prochaine lecture
+              _audioPlayer.stop();
+            }
+          });
+          
+          // Listen to duration changes
+          _audioPlayer.durationStream.listen((newDuration) {
+            if (newDuration != null) {
+              setState(() {
+                _duration = newDuration;
+              });
+            }
+          });
+          
+          // Listen to position changes
+          _audioPlayer.positionStream.listen((newPosition) {
+            setState(() {
+              // S'assurer que la position ne dépasse jamais la durée totale
+              if (newPosition <= _duration) {
+                _position = newPosition;
+              } else {
+                _position = _duration;
+              }
+            });
+          });
+        }
+        
+        await _audioPlayer.play();
+        setState(() {
+          _isPlaying = true;
+        });
+      } catch (e) {
+        print('Error playing audio: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error playing audio: ${e.toString()}'))
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -194,22 +287,68 @@ class IncidentDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // TODO: Implement voice note player with proper URL handling
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // Utiliser le fichier local pour l'audio
-                        final audioSource = incident.voiceNotePath;
-                        
-                        if (audioSource != null) {
-                          // TODO: Implement audio player with the correct source
-                          print('Playing audio from: $audioSource');
-                        }
-                      },
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Play Voice Note'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                    // Lecteur audio pour les notes vocales
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              // Bouton play/pause
+                              IconButton(
+                                onPressed: () {
+                                  if (incident.voiceNotePath != null) {
+                                    _playPause(incident.voiceNotePath!);
+                                  }
+                                },
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.blue,
+                                  size: 36,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Barre de progression
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SliderTheme(
+                                      data: SliderThemeData(
+                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                        trackHeight: 4,
+                                        thumbColor: Colors.blue,
+                                        activeTrackColor: Colors.blue,
+                                        inactiveTrackColor: Colors.grey[300],
+                                      ),
+                                      child: Slider(
+                                        value: _position.inMilliseconds.toDouble().clamp(0, _duration.inMilliseconds.toDouble()),
+                                        max: _duration.inMilliseconds.toDouble(),
+                                        onChanged: (value) {
+                                          final position = Duration(milliseconds: value.toInt());
+                                          _audioPlayer.seek(position);
+                                        },
+                                      ),
+                                    ),
+                                    // Affichage du temps
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(_formatDuration(_position)),
+                                        Text(_formatDuration(_duration)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],

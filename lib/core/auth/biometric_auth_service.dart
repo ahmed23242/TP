@@ -10,6 +10,12 @@ class BiometricAuthService extends GetxController {
   final RxBool isBiometricAvailable = false.obs;
   final RxBool isAuthenticated = false.obs;
 
+  // Méthode d'initialisation pour GetX
+  Future<BiometricAuthService> init() async {
+    await checkBiometricAvailability();
+    return this;
+  }
+
   @override
   void onInit() {
     super.onInit();

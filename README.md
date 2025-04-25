@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/icons/palestine_flag.png" alt="Palestine Flag" width="200"/>
+</div>
+
 # 🚨 Urban Incidents Reporter
 
 A modern Flutter application for reporting and managing urban incidents in real-time.
@@ -5,6 +9,7 @@ A modern Flutter application for reporting and managing urban incidents in real-
 ## 📑 Table of Contents
 - [Features](#-features)
 - [Tech Stack](#️-tech-stack)
+- [Palestine Support](#-palestine-support)
 - [Project Structure](#-project-structure)
 - [Detailed Documentation](#-detailed-documentation)
   - [Frontend](#frontend)
@@ -18,6 +23,10 @@ A modern Flutter application for reporting and managing urban incidents in real-
 - [License](#-license)
 - [Developer](#-developer)
 - [Acknowledgments](#-acknowledgments)
+
+## 🇵🇸 Palestine Support
+
+This application stands in solidarity with Palestine. The app icon features the Palestinian flag as a symbol of our support for Palestinian rights and freedom.
 
 ## 🌟 Features
 

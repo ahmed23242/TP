@@ -9,7 +9,7 @@
     <application
         android:label="accidentsapp"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:enableOnBackInvokedCallback="true"
         android:debuggable="true"
         android:largeHeap="true"

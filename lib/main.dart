@@ -21,6 +21,8 @@ import 'core/services/permission_service.dart';
 import 'features/incidents/services/sync_service.dart';
 import 'core/database/database_helper.dart';
 import 'core/services/navigation_service.dart';
+import 'core/services/app_lifecycle_service.dart';
+import 'core/auth/biometric_auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +45,12 @@ void main() async {
     
     // Initialisation des services d'authentification (dépend de ApiService)
     final authService = await Get.putAsync(() => AuthService(apiService: apiService).init());
+    
+    // Initialisation du service d'authentification biométrique
+    await Get.putAsync(() => BiometricAuthService().init());
+    
+    // Initialisation du service de cycle de vie de l'application
+    await Get.putAsync(() => AppLifecycleService().init());
     
     // Initialisation du service de gestion des incidents
     Get.put(IncidentService(), permanent: true);
