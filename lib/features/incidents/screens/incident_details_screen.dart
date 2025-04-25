@@ -49,7 +49,37 @@ class IncidentDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (incident.photoPath != null)
+            // Afficher l'image depuis l'URL du serveur ou le chemin local
+            if (incident.photoUrl != null && incident.photoUrl!.isNotEmpty)
+              Image.network(
+                incident.photoUrl!,
+                height: 250,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  // Si l'image du serveur ne peut pas être chargée, essayer le fichier local
+                  if (incident.photoPath != null && incident.photoPath!.isNotEmpty) {
+                    return Image.file(
+                      File(incident.photoPath!),
+                      height: 250,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 250,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.error),
+                      ),
+                    );
+                  }
+                  return Container(
+                    height: 250,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.error),
+                  );
+                },
+              )
+            else if (incident.photoPath != null && incident.photoPath!.isNotEmpty)
+              // Si pas d'URL serveur, utiliser le fichier local
               Image.file(
                 File(incident.photoPath!),
                 height: 250,
@@ -153,6 +183,7 @@ class IncidentDetailsScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // Afficher le lecteur audio si un fichier audio est disponible
                   if (incident.voiceNotePath != null) ...[
                     const SizedBox(height: 24),
                     const Text(
@@ -163,13 +194,82 @@ class IncidentDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // TODO: Implement voice note player
+                    // TODO: Implement voice note player with proper URL handling
                     ElevatedButton.icon(
                       onPressed: () {
-                        // TODO: Play voice note
+                        // Utiliser le fichier local pour l'audio
+                        final audioSource = incident.voiceNotePath;
+                        
+                        if (audioSource != null) {
+                          // TODO: Implement audio player with the correct source
+                          print('Playing audio from: $audioSource');
+                        }
                       },
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('Play Voice Note'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                  
+                  // Afficher les médias supplémentaires s'il y en a
+                  if (incident.additionalMedia.isNotEmpty) ...[  
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Additional Media',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 120,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: incident.additionalMedia.length,
+                        itemBuilder: (context, index) {
+                          final media = incident.additionalMedia[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: GestureDetector(
+                              onTap: () {
+                                // Afficher le média en plein écran
+                                // TODO: Implémenter l'affichage en plein écran
+                              },
+                              child: Container(
+                                width: 120,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      media['media_type'] == 'image' 
+                                          ? Icons.image 
+                                          : media['media_type'] == 'video'
+                                              ? Icons.videocam
+                                              : Icons.insert_drive_file,
+                                      size: 40,
+                                      color: Colors.blue,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      media['caption'] ?? 'Media ${index + 1}',
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ],

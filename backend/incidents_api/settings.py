@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.20.10.18', '10.0.2.2', 'votre-nom-utilisateur.pythonanywhere.com', 'ahmedabddayme.pythonanywhere.com']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.20.10.18', '10.0.2.2', '192.168.100.9', 'votre-nom-utilisateur.pythonanywhere.com', 'ahmedabddayme.pythonanywhere.com']
 
 # Application definition
 INSTALLED_APPS = [
@@ -118,10 +118,10 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Media files
+# Media files (Uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

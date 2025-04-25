@@ -8,8 +8,8 @@ import 'connectivity_service.dart';
 
 class ApiService extends GetxService {
   // URL de base de l'API
-  static const String baseUrl = 'http://10.0.2.2:8000/api'; // Pour l'émulateur Android
-  // static const String baseUrl = 'http://172.20.10.18:8000/api'; // Adresse IP de l'ordinateur
+ // static const String baseUrl = 'http://10.0.2.2:8000/api'; // Pour l'émulateur Android
+  static const String baseUrl = 'http://192.168.100.9:8000/api'; // Adresse IP de l'ordinateur
   // static const String baseUrl = 'http://localhost:8000/api'; // Pour le développement local
   // static const String baseUrl = 'https://votre-api-de-production.com/api'; // Pour la production
   
@@ -70,6 +70,8 @@ class ApiService extends GetxService {
   
   Future<void> _checkConnection() async {
     try {
+      developer.log('Tentative de connexion à l\'API: $baseUrl/users/');
+      
       // Use a more reliable endpoint to test connectivity
       final response = await http.get(Uri.parse('$baseUrl/users/'));
       
@@ -98,6 +100,7 @@ class ApiService extends GetxService {
       if (e is http.ClientException) {
         isConnected.value = false;
         developer.log('API connection failed - Server unreachable: $e');
+        developer.log('Vérifiez que: \n1. L\'adresse IP $baseUrl est correcte\n2. Le serveur est bien lancé avec 0.0.0.0:8000\n3. Le téléphone et l\'ordinateur sont sur le même réseau');
       } else {
         // For other errors, still mark as connected since we reached the server
         isConnected.value = true;
@@ -382,25 +385,106 @@ class ApiService extends GetxService {
       
       developer.log('Attempting to sync incident to: ${incidentsEndpoint}');
       developer.log('Sync with headers: $headers');
-      developer.log('With data: ${jsonEncode(incidentData)}');
       
-      // Pour l'envoi de fichiers, il faudrait utiliser multipart/form-data
-      // Mais pour simplifier, nous utiliserons juste application/json
-      final response = await http.post(
-        Uri.parse(incidentsEndpoint),
-        headers: headers,
-        body: jsonEncode(incidentData),
-      );
+      // Vérifier si nous avons des fichiers à envoyer
+      final hasPhotoFile = incidentData['photo_path'] != null;
+      final hasAudioFile = incidentData['voice_note_path'] != null;
       
-      developer.log('Sync response status: ${response.statusCode}');
-      developer.log('Sync response body: ${response.body}');
-      
-      if (response.statusCode == 201) {
-        developer.log('Incident successfully synced to server');
-        return jsonDecode(response.body);
+      if (hasPhotoFile || hasAudioFile) {
+        // Utiliser multipart/form-data pour envoyer des fichiers
+        developer.log('Sending incident with files using multipart/form-data');
+        
+        // Créer un objet Uri pour l'endpoint
+        final uri = Uri.parse(incidentsEndpoint);
+        
+        // Créer une requête multipart
+        final request = http.MultipartRequest('POST', uri);
+        
+        // Ajouter les headers d'authentification
+        request.headers.addAll(headers);
+        
+        // Ajouter tous les champs de texte
+        incidentData.forEach((key, value) {
+          if (value != null && key != 'photo_path' && key != 'voice_note_path') {
+            if (value is String || value is num || value is bool) {
+              request.fields[key] = value.toString();
+            } else {
+              // Pour les objets complexes, les convertir en JSON
+              request.fields[key] = jsonEncode(value);
+            }
+          }
+        });
+        
+        // Ajouter le fichier photo s'il existe
+        if (hasPhotoFile) {
+          final photoPath = incidentData['photo_path'];
+          developer.log('Adding photo file: $photoPath');
+          try {
+            final photoFile = await http.MultipartFile.fromPath(
+              'photo',
+              photoPath,
+              filename: photoPath.split('/').last
+            );
+            request.files.add(photoFile);
+          } catch (e) {
+            developer.log('Error adding photo file: $e');
+          }
+        }
+        
+        // Ajouter le fichier audio s'il existe
+        if (hasAudioFile) {
+          final audioPath = incidentData['voice_note_path'];
+          developer.log('Adding audio file: $audioPath');
+          try {
+            final audioFile = await http.MultipartFile.fromPath(
+              'voice_note',
+              audioPath,
+              filename: audioPath.split('/').last
+            );
+            request.files.add(audioFile);
+          } catch (e) {
+            developer.log('Error adding audio file: $e');
+          }
+        }
+        
+        // Envoyer la requête
+        developer.log('Sending multipart request...');
+        final streamedResponse = await request.send();
+        
+        // Convertir la réponse en http.Response
+        final response = await http.Response.fromStream(streamedResponse);
+        
+        developer.log('Sync response status: ${response.statusCode}');
+        developer.log('Sync response body: ${response.body}');
+        
+        if (response.statusCode == 201) {
+          developer.log('Incident successfully synced to server');
+          return jsonDecode(response.body);
+        } else {
+          developer.log('Sync failed with status: ${response.statusCode}, body: ${response.body}');
+          throw Exception('Failed to sync incident: ${response.body}');
+        }
       } else {
-        developer.log('Sync failed with status: ${response.statusCode}, body: ${response.body}');
-        throw Exception('Failed to sync incident: ${response.body}');
+        // Pas de fichiers à envoyer, utiliser application/json
+        developer.log('Sending incident without files using application/json');
+        developer.log('With data: ${jsonEncode(incidentData)}');
+        
+        final response = await http.post(
+          Uri.parse(incidentsEndpoint),
+          headers: headers,
+          body: jsonEncode(incidentData),
+        );
+        
+        developer.log('Sync response status: ${response.statusCode}');
+        developer.log('Sync response body: ${response.body}');
+        
+        if (response.statusCode == 201) {
+          developer.log('Incident successfully synced to server');
+          return jsonDecode(response.body);
+        } else {
+          developer.log('Sync failed with status: ${response.statusCode}, body: ${response.body}');
+          throw Exception('Failed to sync incident: ${response.body}');
+        }
       }
     } catch (e) {
       developer.log('API sync incident error: $e');

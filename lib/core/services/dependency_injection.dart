@@ -2,7 +2,8 @@ import 'package:get/get.dart';
 import 'dart:developer' as developer;
 
 import 'local_storage_service.dart';
-import 'api_service.dart';
+import '../network/api_service.dart';
+import '../network/connectivity_service.dart';
 import '../../features/incidents/services/stats_service.dart';
 
 class DependencyInjection {
@@ -15,9 +16,16 @@ class DependencyInjection {
       return await service.init();
     });
     
-    // Initialize ApiService
+    // Initialize ConnectivityService first
+    await Get.putAsync<ConnectivityService>(() async {
+      final service = ConnectivityService();
+      return await service.init();
+    });
+    
+    // Initialize ApiService with ConnectivityService dependency
     await Get.putAsync<ApiService>(() async {
-      final service = ApiService();
+      final connectivityService = Get.find<ConnectivityService>();
+      final service = ApiService(connectivityService: connectivityService);
       return await service.init();
     });
     

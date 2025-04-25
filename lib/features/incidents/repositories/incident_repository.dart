@@ -162,9 +162,6 @@ class IncidentRepository {
     final localIncidentObjects = localIncidents.map((data) => Incident.fromMap(data)).toList();
     developer.log('Retrieved ${localIncidentObjects.length} incidents from local database');
     
-    // Fusionner les deux listes en évitant les doublons basés sur l'ID
-    final serverIds = allIncidents.map((incident) => incident.id).toSet();
-    
     // Ajouter les incidents locaux qui ne sont pas déjà dans la liste des incidents du serveur
     for (var localIncident in localIncidentObjects) {
       // Si l'incident a un statut 'pending', l'ajouter à la liste
