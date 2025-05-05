@@ -97,61 +97,30 @@ Tableau de bord
     <div class="col-xl-6 col-md-6 mb-4">
         <div class="card shadow h-100">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Statuts des incidents</h6>
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-pie me-2"></i>Incidents par statut
+                </h6>
             </div>
             <div class="card-body">
-                        {% for stat in status_stats %}
-                <div class="row align-items-center mb-2">
-                            <div class="col-auto">
-                                <div class="text-xs mb-0">{{ stat.status_name }}</div>
-                            </div>
-                            <div class="col">
-                        <div class="progress progress-sm">
-                                    <div class="progress-bar 
-                                    {% if stat.status == 'pending' %}bg-warning
-                                    {% elif stat.status == 'in_progress' %}bg-info
-                                    {% elif stat.status == 'resolved' %}bg-success
-                                    {% else %}bg-secondary{% endif %}" 
-                                    role="progressbar" style="width: {{ stat.percentage }}%"></div>
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                        <div class="text-xs mb-0 font-weight-bold">{{ stat.count }} ({{ stat.percentage }}%)</div>
-                    </div>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="statusChart"></canvas>
                 </div>
-                {% endfor %}
             </div>
         </div>
     </div>
 
-    <!-- Statistiques par type -->
+    <!-- Statistiques par type d'incident -->
     <div class="col-xl-6 col-md-6 mb-4">
         <div class="card shadow h-100">
             <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Types d'incidents</h6>
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-bar me-2"></i>Incidents par type
+                </h6>
             </div>
             <div class="card-body">
-                        {% for stat in type_stats %}
-                <div class="row align-items-center mb-2">
-                            <div class="col-auto">
-                                <div class="text-xs mb-0">{{ stat.type_name }}</div>
-                            </div>
-                            <div class="col">
-                        <div class="progress progress-sm">
-                                    <div class="progress-bar
-                                    {% if stat.incident_type == 'accident' %}bg-danger
-                                    {% elif stat.incident_type == 'fire' %}bg-warning
-                                    {% elif stat.incident_type == 'medical' %}bg-info
-                                    {% elif stat.incident_type == 'crime' %}bg-dark
-                                    {% else %}bg-secondary{% endif %}" 
-                                    role="progressbar" style="width: {{ stat.percentage }}%"></div>
-                                </div>
-                            </div>
-                            <div class="col-auto">
-                        <div class="text-xs mb-0 font-weight-bold">{{ stat.count }} ({{ stat.percentage }}%)</div>
-                    </div>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="typeChart"></canvas>
                 </div>
-                {% endfor %}
             </div>
         </div>
     </div>
@@ -308,111 +277,252 @@ Tableau de bord
 </div>
 
 {% block extra_js %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
-<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-
+<!-- Assurez-vous que ces scripts ne sont pas déjà inclus dans base.html -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Debug: Log the number of map incidents
-        console.log('Map incidents count: {{ map_incidents|length }}');
-        
-        // Définir les types d'incidents et les statuts pour l'affichage
-        const incident_types = {
-            {% for key, value in incident_types.items %}
-                "{{ key }}": "{{ value }}",
-            {% endfor %}
-        };
-        
-        const status_choices = {
-            {% for key, value in status_choices.items %}
-                "{{ key }}": "{{ value }}",
-            {% endfor %}
-        };
-        
-        // Centre initial de la carte (peut être ajusté dynamiquement)
-        const defaultCenter = [48.8566, 2.3522]; // Paris par défaut
-        
-        const map = L.map('incidents-map').setView(defaultCenter, 5);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
-        
-        // Create a marker cluster group
-        const markerCluster = L.markerClusterGroup({
-            disableClusteringAtZoom: 15,  // Disable clustering at high zoom levels
-            spiderfyOnMaxZoom: true,      // Allow markers to spread out when clicked
-            showCoverageOnHover: true,    // Show the area that will be clustered
-            zoomToBoundsOnClick: true     // Zoom to bounds when a cluster is clicked
-        });
-        
-        const markers = [];
-        
-        // Ajouter les marqueurs pour chaque incident
-        const mapIncidents = {{ map_incidents|safe }};
-        console.log('Processing map incidents:', mapIncidents);
-        
-        mapIncidents.forEach(function(incident) {
-            const lat = incident.latitude;
-            const lng = incident.longitude;
+    // Attendre que tout soit complètement chargé
+    window.addEventListener('load', function() {
+        console.log('Fenêtre complètement chargée');
+        setTimeout(function() {
+            // Initialiser les graphiques
+            initCharts();
             
-            // Déterminer la couleur du marqueur en fonction du statut
-            let iconColor;
-            if (incident.status === 'pending') {
-                iconColor = 'red';
-            } else if (incident.status === 'in_progress') {
-                iconColor = 'orange';
-            } else if (incident.status === 'assigned') {
-                iconColor = 'blue';
-            } else if (incident.status === 'under_review') {
-                iconColor = 'purple';
-            } else {
-                iconColor = 'green';
-            }
+            // Initialiser la carte
+            initMap();
+        }, 100); // Petit délai pour s'assurer que tout est bien rendu
+    });
+    
+    function initCharts() {
+        console.log('Initialisation des graphiques');
+        
+        try {
+            // Graphique des statuts
+            const statusCtx = document.getElementById('statusChart');
+            if (statusCtx) {
+                console.log('Canvas statusChart trouvé');
                 
-            const markerIcon = L.divIcon({
-                html: `<i class="fas fa-map-marker-alt" style="color: ${iconColor}; font-size: 24px;"></i>`,
-                className: 'custom-div-icon',
-                iconSize: [30, 30],
-                iconAnchor: [15, 30]
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [{% for stat in status_stats %}"{{ stat.status_name }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+                        datasets: [{
+                            data: [{% for stat in status_stats %}{{ stat.count }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: [
+                                {% for stat in status_stats %}
+                                    {% if stat.status == 'pending' %}'rgba(255, 196, 0, 0.9)'
+                                    {% elif stat.status == 'in_progress' %}'rgba(41, 121, 255, 0.9)'
+                                    {% elif stat.status == 'resolved' %}'rgba(0, 230, 118, 0.9)'
+                                    {% else %}'rgba(245, 0, 87, 0.9)'{% endif %}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: {
+                                        family: 'Montserrat',
+                                        size: 12
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Graphique des statuts créé avec succès');
+            } else {
+                console.error('Canvas statusChart non trouvé');
+            }
+            
+            // Graphique des types d'incidents
+            const typeCtx = document.getElementById('typeChart');
+            if (typeCtx) {
+                console.log('Canvas typeChart trouvé');
+                
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{% for stat in type_stats %}"{{ stat.type_name }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+                        datasets: [{
+                            label: 'Nombre d\'incidents',
+                            data: [{% for stat in type_stats %}{{ stat.count }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                            backgroundColor: [
+                                {% for stat in type_stats %}
+                                    {% if stat.incident_type == 'accident' %}'rgba(220, 53, 69, 0.9)'
+                                    {% elif stat.incident_type == 'fire' %}'rgba(255, 193, 7, 0.9)'
+                                    {% elif stat.incident_type == 'medical' %}'rgba(23, 162, 184, 0.9)'
+                                    {% elif stat.incident_type == 'crime' %}'rgba(52, 58, 64, 0.9)'
+                                    {% else %}'rgba(108, 117, 125, 0.9)'{% endif %}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('Graphique des types créé avec succès');
+            } else {
+                console.error('Canvas typeChart non trouvé');
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'initialisation des graphiques:', error);
+        }
+    }
+    
+    function initMap() {
+        console.log('Initialisation de la carte');
+        
+        try {
+            const mapElement = document.getElementById('incidents-map');
+            
+            if (!mapElement) {
+                console.error('Élément de carte non trouvé');
+                return;
+            }
+            
+            console.log('Élément de carte trouvé, dimensions:', mapElement.offsetWidth, 'x', mapElement.offsetHeight);
+            
+            // Définir les types d'incidents et les statuts pour l'affichage
+            const incident_types = {
+                {% for key, value in incident_types.items %}
+                    "{{ key }}": "{{ value }}",
+                {% endfor %}
+            };
+            
+            const status_choices = {
+                {% for key, value in status_choices.items %}
+                    "{{ key }}": "{{ value }}",
+                {% endfor %}
+            };
+            
+            // Centre initial de la carte (peut être ajusté dynamiquement)
+            const defaultCenter = [36.8, 10.2]; // Tunisie par défaut
+            
+            // Vérifier si L est défini
+            if (typeof L === 'undefined') {
+                console.error('Leaflet (L) n\'est pas défini. La bibliothèque n\'est pas chargée correctement.');
+                return;
+            }
+            
+            const map = L.map('incidents-map').setView(defaultCenter, 8);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Create a marker cluster group
+            const markerCluster = L.markerClusterGroup({
+                disableClusteringAtZoom: 15,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: true,
+                zoomToBoundsOnClick: true
             });
             
-            const marker = L.marker([lat, lng], {icon: markerIcon});
+            const markers = [];
             
-            // Ajouter une fenêtre d'info pour chaque marqueur
-            const content = `
-                <div>
-                    <h5>${incident.title}</h5>
-                    <p><strong>Type:</strong> ${incident_types[incident.incident_type] || incident.incident_type}</p>
-                    <p><strong>Statut:</strong> ${status_choices[incident.status] || incident.status}</p>
-                    <p><a href="/admin-panel/incidents/${incident.id}/" class="btn btn-sm btn-primary">Détails</a></p>
-                </div>
-            `;
+            // Ajouter les marqueurs pour chaque incident
+            const mapIncidents = {{ map_incidents|safe }};
+            console.log('Nombre d\'incidents sur la carte:', mapIncidents.length);
             
-            marker.bindPopup(content);
-            markers.push([lat, lng]);
-            markerCluster.addLayer(marker);
-        });
-
-        
-        // Add the marker cluster group to the map
-        map.addLayer(markerCluster);
-        
-        // Ajuster la carte pour montrer tous les marqueurs
-        if (markers.length > 0) {
-            const bounds = L.latLngBounds(markers);
-            map.fitBounds(bounds);
-            // Limiter le zoom maximum
-            if (map.getZoom() > 15) {
-                map.setZoom(15);
+            if (mapIncidents && mapIncidents.length > 0) {
+                mapIncidents.forEach(function(incident) {
+                    if (!incident.latitude || !incident.longitude) {
+                        console.warn('Incident sans coordonnées:', incident);
+                        return;
+                    }
+                    
+                    const lat = incident.latitude;
+                    const lng = incident.longitude;
+                    
+                    console.log('Ajout d\'un marqueur à:', lat, lng);
+                    
+                    // Déterminer la couleur du marqueur en fonction du statut
+                    let iconColor;
+                    if (incident.status === 'pending') {
+                        iconColor = 'red';
+                    } else if (incident.status === 'in_progress') {
+                        iconColor = 'orange';
+                    } else if (incident.status === 'assigned') {
+                        iconColor = 'blue';
+                    } else if (incident.status === 'under_review') {
+                        iconColor = 'purple';
+                    } else {
+                        iconColor = 'green';
+                    }
+                    
+                    const markerIcon = L.divIcon({
+                        html: `<i class="fas fa-map-marker-alt" style="color: ${iconColor}; font-size: 24px;"></i>`,
+                        className: 'custom-div-icon',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30]
+                    });
+                    
+                    const marker = L.marker([lat, lng], {icon: markerIcon});
+                    
+                    // Ajouter une fenêtre d'info pour chaque marqueur
+                    const content = `
+                        <div>
+                            <h5>${incident.title}</h5>
+                            <p><strong>Type:</strong> ${incident_types[incident.incident_type] || incident.incident_type}</p>
+                            <p><strong>Statut:</strong> ${status_choices[incident.status] || incident.status}</p>
+                            <p><a href="/admin-panel/incidents/${incident.id}/" class="btn btn-sm btn-primary">Détails</a></p>
+                        </div>
+                    `;
+                    
+                    marker.bindPopup(content);
+                    markers.push([lat, lng]);
+                    markerCluster.addLayer(marker);
+                });
+                
+                // Add the marker cluster group to the map
+                map.addLayer(markerCluster);
+                
+                // Ajuster la carte pour montrer tous les marqueurs
+                if (markers.length > 0) {
+                    const bounds = L.latLngBounds(markers);
+                    map.fitBounds(bounds);
+                    // Limiter le zoom maximum
+                    if (map.getZoom() > 15) {
+                        map.setZoom(15);
+                    }
+                }
+            } else {
+                console.warn('Aucun incident avec des coordonnées géographiques');
+                // Centrer la carte sur un point par défaut
+                map.setView(defaultCenter, 8);
             }
+            
+            // Forcer la mise à jour de la carte après le rendu
+            setTimeout(function() {
+                map.invalidateSize();
+                console.log('Carte mise à jour avec invalidateSize()');
+            }, 500);
+            
+        } catch (error) {
+            console.error('Erreur lors de l\'initialisation de la carte:', error);
         }
-    });
+    }
 </script>
 {% endblock %}
 
