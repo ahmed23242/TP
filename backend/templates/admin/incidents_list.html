@@ -49,38 +49,6 @@
     </div>
 </div>
 
-<!-- Graphiques -->
-<div class="row mb-4">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-pie me-2"></i>Incidents par statut
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="chart-container" style="height: 250px;">
-                    <canvas id="statusChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-bar me-2"></i>Incidents par type
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="chart-container" style="height: 250px;">
-                    <canvas id="typeChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Filtres -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -285,9 +253,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Test si Chart.js est correctement chargé
-        console.log('Chart.js disponible:', typeof Chart !== 'undefined');
-        
         // Initialisation des tooltips
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -303,83 +268,6 @@
                 form.submit();
             });
         });
-
-        // Si Chart.js n'est pas disponible, on charge la librairie manuellement
-        if (typeof Chart === 'undefined') {
-            console.log('Chargement manuel de Chart.js');
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
-            script.onload = initCharts;
-            document.head.appendChild(script);
-        } else {
-            initCharts();
-        }
     });
-
-    function initCharts() {
-        console.log('Initialisation des graphiques');
-        
-        try {
-            // Graphique des statuts - Version simplifiée
-            const statusCtx = document.getElementById('statusChart');
-            if (statusCtx) {
-                console.log('Canvas statusChart trouvé');
-                new Chart(statusCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['En attente', 'En cours', 'Résolus', 'Rejetés'],
-                        datasets: [{
-                            data: [10, 15, 20, 5],
-                            backgroundColor: [
-                                '#ffc400',  // En attente (warning)
-                                '#2979ff',  // En cours (info)
-                                '#00e676',  // Résolu (success)
-                                '#f50057'   // Rejeté (danger)
-                            ]
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }
-                });
-                console.log('Graphique des statuts créé');
-            } else {
-                console.error('Canvas statusChart non trouvé');
-            }
-
-            // Graphique des types d'incidents - Version simplifiée
-            const typeCtx = document.getElementById('typeChart');
-            if (typeCtx) {
-                console.log('Canvas typeChart trouvé');
-                new Chart(typeCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Accident', 'Incendie', 'Médical', 'Crime', 'Autre'],
-                        datasets: [{
-                            label: 'Nombre d\'incidents',
-                            data: [12, 8, 15, 6, 9],
-                            backgroundColor: [
-                                '#6200ea',  // Violet (primary)
-                                '#9c27b0',  // Violet clair (secondary)
-                                '#673ab7',  // Indigo
-                                '#3f51b5',  // Bleu
-                                '#2196f3'   // Bleu clair
-                            ]
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }
-                });
-                console.log('Graphique des types créé');
-            } else {
-                console.error('Canvas typeChart non trouvé');
-            }
-        } catch (error) {
-            console.error('Erreur lors de l\'initialisation des graphiques:', error);
-        }
-    }
 </script>
 {% endblock %}
