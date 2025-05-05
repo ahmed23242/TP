@@ -9,6 +9,7 @@ from django.db.models import Count
 from incidents.models import Incident
 from users.models import User
 from backend.forms import IncidentForm
+import json
 
 @login_required
 @staff_member_required
@@ -22,24 +23,21 @@ def admin_incidents_list(request):
     resolved_count = incidents.filter(status='resolved').count()
     
     # Données pour les graphiques
-    import json
-    from django.utils.safestring import mark_safe
-    
     # Données pour le graphique par statut
     status_data = {
-        'labels': ['En attente', 'En cours', 'Résolus', 'Rejetés'],
-        'counts': [
+        'labels': json.dumps(['En attente', 'En cours', 'Résolus', 'Rejetés']),
+        'counts': json.dumps([
             pending_count,
             in_progress_count,
             resolved_count,
             incidents.filter(status='rejected').count()
-        ],
-        'colors': [
-            'rgba(255, 152, 0, 0.7)',   # En attente (warning)
-            'rgba(63, 81, 181, 0.7)',    # En cours (info)
-            'rgba(0, 200, 150, 0.7)',    # Résolu (success)
-            'rgba(244, 67, 54, 0.7)'     # Rejeté (danger)
-        ]
+        ]),
+        'colors': json.dumps([
+            'rgba(255, 196, 0, 0.9)',   # En attente (warning)
+            'rgba(41, 121, 255, 0.9)',   # En cours (info)
+            'rgba(0, 230, 118, 0.9)',    # Résolu (success)
+            'rgba(245, 0, 87, 0.9)'      # Rejeté (danger)
+        ])
     }
     
     # Données pour le graphique par type
@@ -52,20 +50,20 @@ def admin_incidents_list(request):
             type_counts.append(count)
     
     type_data = {
-        'labels': type_labels,
-        'counts': type_counts,
-        'colors': [
-            'rgba(244, 67, 54, 0.7)',    # Accident (danger)
-            'rgba(255, 152, 0, 0.7)',    # Incendie (warning)
-            'rgba(63, 81, 181, 0.7)',    # Médical (info)
-            'rgba(45, 55, 72, 0.7)',     # Crime (dark)
-            'rgba(158, 158, 158, 0.7)'   # Autre (secondary)
-        ]
+        'labels': json.dumps(type_labels),
+        'counts': json.dumps(type_counts),
+        'colors': json.dumps([
+            'rgba(98, 0, 234, 0.9)',    # Violet (primary)
+            'rgba(156, 39, 176, 0.9)',   # Violet clair (secondary)
+            'rgba(103, 58, 183, 0.9)',   # Indigo
+            'rgba(33, 150, 243, 0.9)',   # Bleu
+            'rgba(0, 188, 212, 0.9)'     # Cyan
+        ])
     }
     
     # Conversion en JSON
-    status_chart_data = mark_safe(json.dumps(status_data))
-    type_chart_data = mark_safe(json.dumps(type_data))
+    status_chart_data = json.dumps(status_data)
+    type_chart_data = json.dumps(type_data)
     
     # Filtres
     status_filter = request.GET.get('status', '')
@@ -79,20 +77,23 @@ def admin_incidents_list(request):
     if search_query:
         incidents = incidents.filter(title__icontains=search_query) | incidents.filter(description__icontains=search_query)
     
-    return render(request, 'admin/incidents_list.html', {
+    context = {
         'incidents': incidents,
+        'total_count': total_count,
+        'pending_count': pending_count,
+        'in_progress_count': in_progress_count,
+        'resolved_count': resolved_count,
         'status_filter': status_filter,
         'type_filter': type_filter,
         'search_query': search_query,
         'incident_types': dict(Incident.INCIDENT_TYPES),
         'status_choices': dict(Incident.STATUS_CHOICES),
-        'total_count': total_count,
-        'pending_count': pending_count,
-        'in_progress_count': in_progress_count,
-        'resolved_count': resolved_count,
+        'type_choices': Incident.INCIDENT_TYPES,
         'status_chart_data': status_chart_data,
         'type_chart_data': type_chart_data,
-    })
+    }
+    
+    return render(request, 'admin/incidents_list.html', context)
 
 @login_required
 @staff_member_required
