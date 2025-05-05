@@ -15,6 +15,58 @@ from backend.forms import IncidentForm
 def admin_incidents_list(request):
     incidents = Incident.objects.all().order_by('-created_at')
     
+    # Compteurs pour le tableau de bord
+    total_count = incidents.count()
+    pending_count = incidents.filter(status='pending').count()
+    in_progress_count = incidents.filter(status='in_progress').count()
+    resolved_count = incidents.filter(status='resolved').count()
+    
+    # Données pour les graphiques
+    import json
+    from django.utils.safestring import mark_safe
+    
+    # Données pour le graphique par statut
+    status_data = {
+        'labels': ['En attente', 'En cours', 'Résolus', 'Rejetés'],
+        'counts': [
+            pending_count,
+            in_progress_count,
+            resolved_count,
+            incidents.filter(status='rejected').count()
+        ],
+        'colors': [
+            'rgba(255, 152, 0, 0.7)',   # En attente (warning)
+            'rgba(63, 81, 181, 0.7)',    # En cours (info)
+            'rgba(0, 200, 150, 0.7)',    # Résolu (success)
+            'rgba(244, 67, 54, 0.7)'     # Rejeté (danger)
+        ]
+    }
+    
+    # Données pour le graphique par type
+    type_labels = []
+    type_counts = []
+    for type_key, type_name in Incident.INCIDENT_TYPES:
+        count = incidents.filter(incident_type=type_key).count()
+        if count > 0:  # Ne montrer que les types avec des incidents
+            type_labels.append(type_name)
+            type_counts.append(count)
+    
+    type_data = {
+        'labels': type_labels,
+        'counts': type_counts,
+        'colors': [
+            'rgba(244, 67, 54, 0.7)',    # Accident (danger)
+            'rgba(255, 152, 0, 0.7)',    # Incendie (warning)
+            'rgba(63, 81, 181, 0.7)',    # Médical (info)
+            'rgba(45, 55, 72, 0.7)',     # Crime (dark)
+            'rgba(158, 158, 158, 0.7)'   # Autre (secondary)
+        ]
+    }
+    
+    # Conversion en JSON
+    status_chart_data = mark_safe(json.dumps(status_data))
+    type_chart_data = mark_safe(json.dumps(type_data))
+    
     # Filtres
     status_filter = request.GET.get('status', '')
     type_filter = request.GET.get('type', '')
@@ -34,6 +86,12 @@ def admin_incidents_list(request):
         'search_query': search_query,
         'incident_types': dict(Incident.INCIDENT_TYPES),
         'status_choices': dict(Incident.STATUS_CHOICES),
+        'total_count': total_count,
+        'pending_count': pending_count,
+        'in_progress_count': in_progress_count,
+        'resolved_count': resolved_count,
+        'status_chart_data': status_chart_data,
+        'type_chart_data': type_chart_data,
     })
 
 @login_required

@@ -3,257 +3,587 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Administration des incidents{% endblock %}</title>
+    <title>{% block title %}Système de Gestion{% endblock %}</title>
     
-    <!-- Bootstrap CSS -->
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    
     <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
     
     <style>
         :root {
-            --primary-color: #4e73df;
-            --secondary-color: #858796;
-            --success-color: #1cc88a;
-            --info-color: #36b9cc;
-            --warning-color: #f6c23e;
-            --danger-color: #e74a3b;
-            --light-color: #f8f9fc;
-            --dark-color: #5a5c69;
+            --primary: #2c3e50;
+            --secondary: #16a085;
+            --success: #27ae60;
+            --info: #3498db;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --sidebar-width: 280px;
+            --header-height: 60px;
         }
         
         body {
-            background-color: #f8f9fc;
+            font-family: 'Montserrat', sans-serif;
+            background-color: #ecf0f1;
+            color: #333;
+            overflow-x: hidden;
         }
         
-        .sidebar {
-            min-height: 100vh;
-            background-color: var(--primary-color);
-            background-image: linear-gradient(180deg, var(--primary-color) 10%, #224abe 100%);
-            background-size: cover;
-        }
-        
-        .sidebar-brand {
-            height: 4.375rem;
-            text-decoration: none;
-            font-size: 1rem;
-            font-weight: 800;
-            padding: 1.5rem 1rem;
-            text-align: center;
+        /* Header */
+        .main-header {
+            height: var(--header-height);
+            background: linear-gradient(135deg, var(--primary) 0%, #34495e 100%);
             color: white;
-            margin-bottom: 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s;
         }
         
-        .sidebar hr {
-            margin: 0 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
-        }
-        
-        .sidebar .nav-item {
-            position: relative;
-        }
-        
-        .sidebar .nav-item .nav-link {
-            color: rgba(255, 255, 255, 0.8);
+        .brand-logo {
+            font-size: 1.5rem;
             font-weight: 700;
-            padding: 0.75rem 1rem;
-            display: block;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+        
+        .brand-logo i {
+            margin-right: 10px;
+            font-size: 1.8rem;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: white;
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            z-index: 1020;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            overflow-y: auto;
+        }
+        
+        .sidebar.collapsed {
+            width: 70px;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background: var(--light);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .sidebar-user {
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-user-img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--secondary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .sidebar-user-info {
+            overflow: hidden;
+        }
+        
+        .sidebar-user-name {
+            font-weight: 600;
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+        
+        .sidebar-user-role {
+            font-size: 0.8rem;
+            color: #777;
+            white-space: nowrap;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            color: var(--dark);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            border-radius: 5px;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--secondary);
+            color: white;
+        }
+        
+        .nav-link i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .nav-text {
+            transition: opacity 0.3s;
+        }
+        
+        .sidebar.collapsed .nav-text {
+            opacity: 0;
+            width: 0;
+            display: none;
+        }
+        
+        /* Main content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 20px;
+            min-height: calc(100vh - var(--header-height));
+            transition: all 0.3s;
+        }
+        
+        .main-content.expanded {
+            margin-left: 70px;
+        }
+        
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 15px 20px;
+            font-weight: 600;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* Stats cards */
+        .stat-card {
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .stat-card.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #34495e 100%);
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, var(--success) 0%, #2ecc71 100%);
+        }
+        
+        .stat-card.warning {
+            background: linear-gradient(135deg, var(--warning) 0%, #f1c40f 100%);
+        }
+        
+        .stat-card.info {
+            background: linear-gradient(135deg, var(--info) 0%, #2980b9 100%);
+        }
+        
+        .stat-card-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 3rem;
+            opacity: 0.2;
+        }
+        
+        .stat-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card-title {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        
+        /* Tables */
+        .table {
+            width: 100%;
+            margin-bottom: 0;
+        }
+        
+        .table th {
+            font-weight: 600;
+            color: var(--primary);
+            border-top: none;
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .table td {
+            vertical-align: middle;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        /* Status badges */
+        .badge {
+            padding: 6px 10px;
+            font-weight: 500;
+            border-radius: 30px;
+        }
+        
+        .badge-pending {
+            background-color: var(--warning);
+            color: white;
+        }
+        
+        .badge-in-progress {
+            background-color: var(--info);
+            color: white;
+        }
+        
+        .badge-resolved {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .badge-rejected {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 5px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #34495e;
+            border-color: #34495e;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #1abc9c;
+            border-color: #1abc9c;
+        }
+        
+        /* Forms */
+        .form-control {
+            border-radius: 5px;
+            padding: 10px 15px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .form-control:focus {
+            box-shadow: none;
+            border-color: var(--secondary);
+        }
+        
+        /* Pagination */
+        .pagination {
+            margin-bottom: 0;
+        }
+        
+        .page-link {
+            color: var(--primary);
+            border: none;
+            margin: 0 3px;
+            border-radius: 5px;
+        }
+        
+        .page-link:hover {
+            background-color: var(--light);
+            color: var(--primary);
+        }
+        
+        .page-item.active .page-link {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .main-content.expanded {
+                margin-left: 0;
+            }
+        }
+        
+        /* Animation classes */
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.5s;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* Chart container */
+        .chart-container {
+            position: relative;
+            height: 300px;
             width: 100%;
         }
         
-        .sidebar .nav-item .nav-link:hover {
-            color: white;
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
         
-        .sidebar .nav-item .nav-link i {
-            margin-right: 0.25rem;
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
         
-        .sidebar .nav-item .nav-link.active {
-            color: white;
-            font-weight: 700;
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
         }
         
-        .topbar {
-            height: 4.375rem;
-        }
-        
-        .topbar .navbar {
-            height: 4.375rem;
-            padding: 0 1rem;
-        }
-        
-        .border-left-primary {
-            border-left: 0.25rem solid var(--primary-color) !important;
-        }
-        
-        .border-left-success {
-            border-left: 0.25rem solid var(--success-color) !important;
-        }
-        
-        .border-left-info {
-            border-left: 0.25rem solid var(--info-color) !important;
-        }
-        
-        .border-left-warning {
-            border-left: 0.25rem solid var(--warning-color) !important;
-        }
-        
-        .border-left-danger {
-            border-left: 0.25rem solid var(--danger-color) !important;
-        }
-        
-        .border-left-dark {
-            border-left: 0.25rem solid var(--dark-color) !important;
-        }
-        
-        .text-xs {
-            font-size: 0.7rem;
-        }
-        
-        .progress-sm {
-            height: 0.5rem;
-        }
-        
-        @media (min-width: 768px) {
-            .sidebar {
-                width: 14rem !important;
-            }
-            .sidebar .nav-item .nav-link {
-                padding-left: 1.5rem;
-                padding-right: 1.5rem;
-                width: 14rem;
-            }
-            .sidebar .nav-item .nav-link span {
-                display: inline;
-            }
-            .content {
-                margin-left: 14rem;
-            }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
+    
+    {% block extra_css %}{% endblock %}
 </head>
-
 <body>
-    <div class="d-flex">
-        <!-- Sidebar -->
-        <ul class="navbar-nav sidebar shadow-sm">
-            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{% url 'admin_dashboard' %}">
-                <div class="sidebar-brand-icon mx-2">
-                    <i class="fas fa-map-marked-alt"></i>
-                </div>
-                <div class="sidebar-brand-text">Incidents Admin</div>
-            </a>
-            
-            <hr class="sidebar-divider my-0">
-            
-            <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">
-                    <i class="fas fa-fw fa-tachometer-alt"></i>
-                    <span>Tableau de bord</span>
-                </a>
-            </li>
-            
-            <hr class="sidebar-divider">
-            
-            <li class="nav-item">
-                <a class="nav-link {% if 'incidents_list' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_incidents_list' %}">
-                    <i class="fas fa-fw fa-clipboard-list"></i>
-                    <span>Incidents</span>
-                </a>
-            </li>
-            
-            <hr class="sidebar-divider">
-            
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'admin:index' %}">
-                    <i class="fas fa-fw fa-cogs"></i>
-                    <span>Admin Django</span>
-                </a>
-            </li>
-            
-            <hr class="sidebar-divider d-none d-md-block">
-        </ul>
-        
-        <!-- Content Wrapper -->
-        <div class="d-flex flex-column w-100 content">
-            <!-- Topbar -->
-            <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 shadow-sm">
-                <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
-                    <i class="fa fa-bars"></i>
-                </button>
-                
-                <!-- Topbar Title -->
-                <h1 class="h3 mb-0 text-gray-800 d-none d-md-inline-block">
-                    {% block page_title %}Administration{% endblock %}
-                </h1>
-                
-                <!-- Topbar Navbar -->
-                <ul class="navbar-nav ms-auto">
-                    <div class="topbar-divider d-none d-sm-block"></div>
-                    
-                    <!-- User Information -->
-                    <li class="nav-item dropdown no-arrow">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ request.user.username }}</span>
-                            <i class="fas fa-user fa-fw"></i>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="container-fluid">
+            <div class="row align-items-center h-100">
+                <div class="col">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'admin_dashboard' %}" class="brand-logo">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>SecureAlert</span>
                         </a>
-                        <!-- Dropdown - User Information -->
-                        <div class="dropdown-menu dropdown-menu-end shadow animated--grow-in"
-                            aria-labelledby="userDropdown">
-                            <a class="dropdown-item" href="{% url 'admin:index' %}">
-                                <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>
-                                Paramètres
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="{% url 'admin:logout' %}">
-                                <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                Déconnexion
-                            </a>
+                        <div class="d-flex align-items-center">
+                            <button id="sidebar-toggle" class="btn btn-link text-white me-3">
+                                <i class="fas fa-bars"></i>
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-link text-white dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user-circle me-1"></i>
+                                    {{ request.user.username }}
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profil</a></li>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Paramètres</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</a></li>
+                                </ul>
+                            </div>
                         </div>
-                    </li>
-                </ul>
-            </nav>
-            
-            <!-- Main Content -->
-            <div class="container-fluid">
-                <!-- Page Heading -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h1 class="h3 mb-0 text-gray-800 d-md-none">
-                        {% block mobile_page_title %}{{ page_title }}{% endblock %}
-                    </h1>
-                    {% block page_actions %}{% endblock %}
+                    </div>
                 </div>
-                
-                {% if messages %}
-                <div class="messages">
+            </div>
+        </div>
+    </header>
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-user">
+                <div class="sidebar-user-img">
+                    {{ request.user.username|first|upper }}
+                </div>
+                <div class="sidebar-user-info">
+                    <p class="sidebar-user-name">{{ request.user.username }}</p>
+                    <p class="sidebar-user-role">Administrateur</p>
+                </div>
+            </div>
+        </div>
+        <ul class="nav flex-column mt-3">
+            <li class="nav-item">
+                <a href="{% url 'admin_dashboard' %}" class="nav-link {% if request.path == '/admin/' %}active{% endif %}">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span class="nav-text">Tableau de bord</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'admin_incidents_list' %}" class="nav-link {% if '/admin/incidents/' in request.path %}active{% endif %}">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span class="nav-text">Incidents</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'admin_users_list' %}" class="nav-link {% if '/admin/users/' in request.path %}active{% endif %}">
+                    <i class="fas fa-users"></i>
+                    <span class="nav-text">Utilisateurs</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span class="nav-text">Statistiques</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link">
+                    <i class="fas fa-cog"></i>
+                    <span class="nav-text">Paramètres</span>
+                </a>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Main content -->
+    <main class="main-content">
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="h3 mb-0 text-gray-800">{% block page_title %}Tableau de bord{% endblock %}</h1>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb bg-transparent p-0 mb-0">
+                            <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Accueil</a></li>
+                            {% block breadcrumb %}{% endblock %}
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+            
+            {% if messages %}
+            <div class="row">
+                <div class="col">
                     {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                     {% endfor %}
                 </div>
-                {% endif %}
-                
-                {% block content %}{% endblock %}
             </div>
+            {% endif %}
             
-            <!-- Footer -->
-            <footer class="sticky-footer bg-white mt-auto">
-                <div class="container my-auto">
-                    <div class="copyright text-center my-auto">
-                        <span>Devlopped by Ahmed Abd Dayme AhmedBouha; Incidents App 2025</span>
-                    </div>
-                </div>
-            </footer>
+            {% block content %}{% endblock %}
         </div>
-    </div>
+    </main>
     
     <!-- Bootstrap core JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle sidebar
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('.main-content');
+            
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                mainContent.classList.toggle('expanded');
+            });
+            
+            // Responsive sidebar
+            const mediaQuery = window.matchMedia('(max-width: 992px)');
+            
+            function handleMediaChange(e) {
+                if (e.matches) {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('expanded');
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('expanded');
+                }
+            }
+            
+            mediaQuery.addEventListener('change', handleMediaChange);
+            handleMediaChange(mediaQuery);
+            
+            // Animation for cards
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('slide-in');
+                }, index * 100);
+            });
+        });
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
-</html> 
+</html>

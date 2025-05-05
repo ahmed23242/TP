@@ -1,122 +1,234 @@
-{% extends "admin/base.html" %}
+{% extends 'admin/base.html' %}
 
-{% block title %}Liste des incidents - Administration des incidents{% endblock %}
+{% block title %}Gestion des Incidents{% endblock %}
 
-{% block page_title %}
-Liste des incidents
-{% endblock %}
+{% block page_title %}Gestion des Incidents{% endblock %}
 
-{% block page_actions %}
-<!-- Le bouton pour créer un nouvel incident est supprimé -->
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Incidents</li>
 {% endblock %}
 
 {% block content %}
+<!-- Statistiques -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-4">
+        <div class="stat-card primary">
+            <div class="stat-card-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="stat-card-value">{{ total_count }}</div>
+            <div class="stat-card-title">Total des incidents</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card warning">
+            <div class="stat-card-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-card-value">{{ pending_count }}</div>
+            <div class="stat-card-title">En attente</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card info">
+            <div class="stat-card-icon">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div class="stat-card-value">{{ in_progress_count }}</div>
+            <div class="stat-card-title">En cours</div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card success">
+            <div class="stat-card-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-card-value">{{ resolved_count }}</div>
+            <div class="stat-card-title">Résolus</div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Incidents par statut
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Incidents par type
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="typeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filtres -->
-<div class="card shadow mb-4">
-    <div class="card-header py-3">
-        <h6 class="m-0 font-weight-bold text-primary">Filtres</h6>
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-filter me-2"></i>Filtres
+        </h5>
+        <a href="{% url 'admin_incidents_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-redo me-1"></i>Réinitialiser
+        </a>
     </div>
     <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-4">
-                <label for="type" class="form-label">Type d'incident</label>
-                <select name="type" id="type" class="form-select">
-                    <option value="">Tous les types</option>
-                    {% for type_key, type_name in incident_types.items %}
-                    <option value="{{ type_key }}" {% if type_filter == type_key %}selected{% endif %}>{{ type_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-4">
+        <form method="get" action="{% url 'admin_incidents_list' %}" class="row g-3">
+            <div class="col-md-3">
                 <label for="status" class="form-label">Statut</label>
                 <select name="status" id="status" class="form-select">
                     <option value="">Tous les statuts</option>
-                    {% for status_key, status_name in status_choices.items %}
-                    <option value="{{ status_key }}" {% if status_filter == status_key %}selected{% endif %}>{{ status_name }}</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>En attente</option>
+                    <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>En cours</option>
+                    <option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Résolu</option>
+                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejeté</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="type" class="form-label">Type</label>
+                <select name="type" id="type" class="form-select">
+                    <option value="">Tous les types</option>
+                    {% for type_choice in incident_types %}
+                    <option value="{{ type_choice.0 }}" {% if type_filter == type_choice.0 %}selected{% endif %}>{{ type_choice.1 }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col-md-4">
-                <label for="q" class="form-label">Recherche</label>
-                <input type="text" name="q" id="q" class="form-control" value="{{ search_query }}" placeholder="Recherche par titre ou description">
+                <label for="search" class="form-label">Recherche</label>
+                <input type="text" name="search" id="search" class="form-control" placeholder="Titre, description..." value="{{ search_query }}">
             </div>
-            <div class="col-12 text-end mt-3">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-filter"></i> Filtrer
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search me-1"></i>Filtrer
                 </button>
-                <a href="{% url 'admin_incidents_list' %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-sync"></i> Réinitialiser
-                </a>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Liste des incidents -->
-<div class="card shadow mb-4">
-    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-        <h6 class="m-0 font-weight-bold text-primary">Liste des incidents</h6>
-        <span class="badge bg-secondary">{{ incidents.count }} incident(s)</span>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>Liste des incidents ({{ incidents.count }})
+        </h5>
+        <div>
+            <a href="#" class="btn btn-sm btn-outline-secondary me-2">
+                <i class="fas fa-file-export me-1"></i>Exporter
+            </a>
+            <a href="#" class="btn btn-sm btn-secondary">
+                <i class="fas fa-print me-1"></i>Imprimer
+            </a>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-striped table-hover mb-0">
-                <thead class="bg-light">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
                     <tr>
                         <th>ID</th>
                         <th>Titre</th>
                         <th>Type</th>
-                        <th>Statut</th>
-                      
+                        <th>Utilisateur</th>
                         <th>Date</th>
+                        <th>Statut</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for incident in incidents %}
                     <tr>
-                        <td>{{ incident.id }}</td>
-                        <td>{{ incident.title }}</td>
+                        <td>#{{ incident.id }}</td>
                         <td>
-                            <span class="badge
-                            {% if incident.incident_type == 'accident' %}bg-danger
-                            {% elif incident.incident_type == 'fire' %}bg-warning
-                            {% elif incident.incident_type == 'medical' %}bg-info
-                            {% elif incident.incident_type == 'crime' %}bg-dark
-                            {% else %}bg-secondary{% endif %}">
+                            <div class="d-flex align-items-center">
+                                {% if incident.incident_type == 'accident' %}
+                                <i class="fas fa-car-crash text-danger me-2"></i>
+                                {% elif incident.incident_type == 'fire' %}
+                                <i class="fas fa-fire text-warning me-2"></i>
+                                {% elif incident.incident_type == 'medical' %}
+                                <i class="fas fa-heartbeat text-info me-2"></i>
+                                {% elif incident.incident_type == 'crime' %}
+                                <i class="fas fa-user-shield text-dark me-2"></i>
+                                {% else %}
+                                <i class="fas fa-exclamation-circle text-secondary me-2"></i>
+                                {% endif %}
+                                <div>
+                                    <a href="{% url 'admin_incident_detail' incident.id %}" class="text-decoration-none fw-medium">
+                                        {{ incident.title }}
+                                    </a>
+                                    <div class="small text-muted">{{ incident.description|truncatechars:50 }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark">
                                 {{ incident.get_incident_type_display }}
                             </span>
                         </td>
                         <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-sm me-2 bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 12px;">
+                                    {{ incident.user.username|first|upper }}
+                                </div>
+                                <div>{{ incident.user.username }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div>{{ incident.created_at|date:"d/m/Y" }}</div>
+                            <small class="text-muted">{{ incident.created_at|time:"H:i" }}</small>
+                        </td>
+                        <td>
                             <form id="status-form-{{ incident.id }}" method="post" action="{% url 'admin_incident_update_status' incident.id %}">
                                 {% csrf_token %}
-                                <select name="status" class="form-select form-select-sm status-select" data-incident-id="{{ incident.id }}">
-                                    {% for status_key, status_name in status_choices.items %}
-                                    <option value="{{ status_key }}" {% if incident.status == status_key %}selected{% endif %}
-                                        class="{% if status_key == 'pending' %}text-warning
-                                               {% elif status_key == 'in_progress' %}text-info
-                                               {% elif status_key == 'resolved' %}text-success
-                                               {% else %}text-secondary{% endif %}">
-                                        {{ status_name }}
-                                    </option>
-                                    {% endfor %}
+                                <select name="status" class="form-select form-select-sm status-select" data-incident-id="{{ incident.id }}" style="width: 130px;">
+                                    <option value="pending" {% if incident.status == 'pending' %}selected{% endif %} class="text-warning">En attente</option>
+                                    <option value="in_progress" {% if incident.status == 'in_progress' %}selected{% endif %} class="text-info">En cours</option>
+                                    <option value="resolved" {% if incident.status == 'resolved' %}selected{% endif %} class="text-success">Résolu</option>
+                                    <option value="rejected" {% if incident.status == 'rejected' %}selected{% endif %} class="text-danger">Rejeté</option>
                                 </select>
                             </form>
                         </td>
-                        
-                        <td>{{ incident.created_at|date:"d/m/Y H:i" }}</td>
                         <td>
-                            <div class="btn-group btn-group-sm">
-                                <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-primary">
+                            <div class="d-flex">
+                                <a href="{% url 'admin_incident_detail' incident.id %}" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="tooltip" title="Voir détails">
                                     <i class="fas fa-eye"></i>
                                 </a>
+                                <a href="{% url 'admin_incident_edit' incident.id %}" class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="tooltip" title="Modifier">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Supprimer">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="7" class="text-center py-4">
-                            <i class="fas fa-info-circle me-2"></i> Aucun incident trouvé.
+                            <div class="py-5">
+                                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                                <h5>Aucun incident trouvé</h5>
+                                <p class="text-muted">Essayez de modifier vos filtres ou d'ajouter un nouvel incident.</p>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -124,15 +236,63 @@ Liste des incidents
             </table>
         </div>
     </div>
+    {% if incidents.has_other_pages %}
+    <div class="card-footer">
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center mb-0">
+                {% if incidents.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="First">
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ incidents.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Previous">
+                        <i class="fas fa-angle-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for num in incidents.paginator.page_range %}
+                {% if incidents.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > incidents.number|add:'-3' and num < incidents.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+                {% endfor %}
+                
+                {% if incidents.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ incidents.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Next">
+                        <i class="fas fa-angle-right"></i>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ incidents.paginator.num_pages }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Last">
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
-{% endblock %} 
+{% endblock %}
 
 {% block extra_js %}
 <script>
-    // JavaScript to handle status change
     document.addEventListener('DOMContentLoaded', function() {
-        const statusSelects = document.querySelectorAll('.status-select');
+        // Initialisation des tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
         
+        // Gestion du changement de statut
+        const statusSelects = document.querySelectorAll('.status-select');
         statusSelects.forEach(select => {
             select.addEventListener('change', function() {
                 const incidentId = this.getAttribute('data-incident-id');
@@ -140,6 +300,91 @@ Liste des incidents
                 form.submit();
             });
         });
+
+        // Initialisation des graphiques
+        initCharts();
     });
+
+    function initCharts() {
+        try {
+            // Données pour les graphiques
+            const statusData = JSON.parse('{{ status_chart_data|escapejs }}');
+            const typeData = JSON.parse('{{ type_chart_data|escapejs }}');
+            
+            // Graphique des statuts
+            const statusCtx = document.getElementById('statusChart');
+            if (statusCtx) {
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: statusData.labels,
+                        datasets: [{
+                            data: statusData.counts,
+                            backgroundColor: statusData.colors,
+                            borderColor: statusData.colors.map(color => color.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Graphique des types d'incidents
+            const typeCtx = document.getElementById('typeChart');
+            if (typeCtx) {
+                new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeData.labels,
+                        datasets: [{
+                            label: 'Nombre d\'incidents',
+                            data: typeData.counts,
+                            backgroundColor: typeData.colors.slice(0, typeData.labels.length),
+                            borderColor: typeData.colors.slice(0, typeData.labels.length).map(color => color.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Erreur lors de l'initialisation des graphiques:", error);
+        }
+    }
 </script>
 {% endblock %}

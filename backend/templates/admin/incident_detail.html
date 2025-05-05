@@ -1,152 +1,211 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Détail de l'incident #{{ incident.id }}{% endblock %}
+{% block title %}Détail de l'incident - UrbanWatch{% endblock %}
 
 {% block page_title %}
-Incident #{{ incident.id }} - {{ incident.title }}
+Détail de l'incident
 {% endblock %}
 
 {% block page_actions %}
-<div class="btn-group">
+<div class="d-flex gap-2">
+    <a href="{% url 'admin_incidents_list' %}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left me-2"></i>Retour
+    </a>
     <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
-        <i class="fas fa-trash"></i> Supprimer
+        <i class="fas fa-trash me-2"></i>Supprimer
     </button>
 </div>
 {% endblock %}
 
 {% block content %}
-<!-- Mobile-friendly container with proper spacing -->
 <div class="row g-4">
-    <div class="col-lg-8 col-md-12">
-        <!-- Information principale -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">{{ incident.title }}</h5>
-                <div>
-                    <form id="status-form" method="post" action="{% url 'admin_incident_update_status' incident.id %}" class="d-inline-flex align-items-center">
-                        {% csrf_token %}
-                        <label for="status" class="me-2">Statut:</label>
-                        <select name="status" id="status" class="form-select form-select-sm" style="width: auto;" onchange="document.getElementById('status-form').submit();">
-                            {% for status_key, status_name in incident.STATUS_CHOICES %}
-                            <option value="{{ status_key }}" {% if incident.status == status_key %}selected{% endif %}
-                                class="{% if status_key == 'pending' %}text-warning
-                                       {% elif status_key == 'in_progress' %}text-info
-                                       {% elif status_key == 'resolved' %}text-success
-                                       {% else %}text-secondary{% endif %}">
-                                {{ status_name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="mb-4">
-                    <h6 class="text-muted">Description</h6>
-                    <p>{{ incident.description|linebreaks }}</p>
-                </div>
-                
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Type d'incident</h6>
-                        <p>
-                            <span class="badge
-                            {% if incident.incident_type == 'accident' %}bg-danger
-                            {% elif incident.incident_type == 'fire' %}bg-warning
-                            {% elif incident.incident_type == 'medical' %}bg-info
-                            {% elif incident.incident_type == 'crime' %}bg-dark
-                            {% else %}bg-secondary{% endif %} p-2">
+    <!-- En-tête d'incident -->
+    <div class="col-12 mb-2">
+        <div class="card border-0 bg-gradient-primary text-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-1">{{ incident.title }}</h4>
+                        <div class="d-flex align-items-center">
+                            <span class="badge 
+                            {% if incident.incident_type == 'accident' %}badge-danger
+                            {% elif incident.incident_type == 'fire' %}badge-warning
+                            {% elif incident.incident_type == 'medical' %}badge-info
+                            {% elif incident.incident_type == 'crime' %}badge-dark
+                            {% else %}bg-secondary{% endif %} me-2">
                                 {{ incident.get_incident_type_display }}
                             </span>
-                        </p>
+                            <span class="small text-white-50">
+                                <i class="far fa-calendar me-1"></i>{{ incident.created_at|date:"d/m/Y H:i" }}
+                            </span>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <h6 class="text-muted">Date de création</h6>
-                        <p>{{ incident.created_at|date:"d/m/Y H:i" }}</p>
+                    <div>
+                        <form id="status-form" method="post" action="{% url 'admin_incident_update_status' incident.id %}" class="d-inline-flex align-items-center">
+                            {% csrf_token %}
+                            <select name="status" id="status" class="form-select form-select-sm status-select" style="width: auto;" onchange="document.getElementById('status-form').submit();">
+                                {% for status_key, status_name in incident.STATUS_CHOICES %}
+                                <option value="{{ status_key }}" {% if incident.status == status_key %}selected{% endif %}
+                                    class="{% if status_key == 'pending' %}text-warning
+                                           {% elif status_key == 'in_progress' %}text-info
+                                           {% elif status_key == 'resolved' %}text-success
+                                           {% else %}text-secondary{% endif %}">
+                                    {{ status_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Colonne principale -->
+    <div class="col-lg-8 col-md-12">
+        <!-- Détails de l'incident -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title border-bottom pb-3 mb-3">
+                    <i class="fas fa-info-circle me-2"></i>Détails de l'incident
+                </h5>
+                
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3">Description</h6>
+                    <div class="p-3 bg-light rounded">
+                        {{ incident.description|linebreaks }}
                     </div>
                 </div>
                 
+                <!-- Localisation -->
                 <div class="mb-4">
-                    <h6 class="text-muted">Utilisateur</h6>
-                    {% if user_info %}
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Nom:</strong> {{ user_info.username }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Email:</strong> {{ user_info.email }}</p>
-                        </div>
-                    </div>
-                    <p>
-                        <a href="{% url 'admin:users_user_change' user_info.id %}" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-user"></i> Voir le profil
-                        </a>
-                    </p>
-                    {% else %}
-                    <p>Information utilisateur non disponible</p>
-                    {% endif %}
-                </div>
-                
-                <!-- Carte -->
-                <div class="mb-4">
-                    <h6 class="text-muted">Localisation</h6>
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-map-marker-alt me-2"></i>Localisation
+                    </h6>
                     {% if incident.latitude and incident.longitude %}
-                        <div id="incident-map" style="height: 300px; width: 100%; border-radius: 8px;"></div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Latitude:</strong> {{ incident.latitude }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Longitude:</strong> {{ incident.longitude }}</p>
-                            </div>
-                        </div>
+                    <div id="incident-map" style="height: 300px; border-radius: 12px;" class="mb-3"></div>
+                    <div class="d-flex justify-content-between">
+                        <span class="badge bg-light text-dark">
+                            <i class="fas fa-map-pin me-1"></i>Lat: {{ incident.latitude|floatformat:6 }}
+                        </span>
+                        <span class="badge bg-light text-dark">
+                            <i class="fas fa-map-pin me-1"></i>Long: {{ incident.longitude|floatformat:6 }}
+                        </span>
+                    </div>
                     {% else %}
                     <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Aucune coordonnée géographique disponible.
+                        <i class="fas fa-info-circle me-2"></i>Aucune coordonnée géographique disponible.
                     </div>
                     {% endif %}
                 </div>
             </div>
         </div>
         
-        
+        <!-- Informations utilisateur -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title border-bottom pb-3 mb-3">
+                    <i class="fas fa-user me-2"></i>Informations sur l'utilisateur
+                </h5>
+                
+                {% if user_info %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="avatar-circle me-3">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">{{ user_info.username }}</h6>
+                        <p class="text-muted mb-0 small">{{ user_info.email }}</p>
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label">Téléphone</span>
+                            <span class="info-value">{{ user_info.phone|default:"Non renseigné" }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label">Date d'inscription</span>
+                            <span class="info-value">{{ user_info.date_joined|date:"d/m/Y" }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label">Incidents signalés</span>
+                            <span class="info-value">{{ user_info.incident_set.count }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item">
+                            <span class="info-label">Statut</span>
+                            <span class="info-value">
+                                {% if user_info.is_active %}
+                                <span class="badge badge-success">Actif</span>
+                                {% else %}
+                                <span class="badge badge-danger">Inactif</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{% url 'admin:users_user_change' user_info.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-user-edit me-1"></i>Voir le profil complet
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Information utilisateur non disponible
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
     
     <!-- Colonne latérale -->
     <div class="col-lg-4 col-md-12">
-        <!-- Média principal de l'incident -->
+        <!-- Média principal -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Média principal</h5>
-            </div>
-            <div class="card-body text-center">
+            <div class="card-body">
+                <h5 class="card-title border-bottom pb-3 mb-3">
+                    <i class="fas fa-image me-2"></i>Média principal
+                </h5>
+                
                 {% if incident.photo and incident.photo.name %}
                     {% with ext=incident.photo.url|lower %}
                         {% if '.mp4' in ext or '.mov' in ext or '.avi' in ext or '.webm' in ext %}
-                            <!-- Vidéo -->
-                            <div class="ratio ratio-16x9 mb-3">
-                                <video controls class="rounded">
+                            <div class="video-container mb-3">
+                                <video controls class="w-100 rounded">
                                     <source src="{{ incident.photo.url }}" type="video/mp4">
                                     Votre navigateur ne supporte pas la lecture vidéo.
                                 </video>
                             </div>
                         {% else %}
-                            <!-- Image -->
-                            <a href="{{ incident.photo.url }}" target="_blank" class="d-block" data-bs-toggle="modal" data-bs-target="#imageModal">
-                                <img src="{{ incident.photo.url }}" alt="Photo de l'incident" class="img-fluid rounded" style="max-height: 300px;">
+                            <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal">
+                                <div class="media-thumbnail mb-3">
+                                    <img src="{{ incident.photo.url }}" alt="Photo de l'incident" class="img-fluid rounded">
+                                    <div class="media-overlay">
+                                        <i class="fas fa-search-plus"></i>
+                                    </div>
+                                </div>
                             </a>
                         {% endif %}
                     {% endwith %}
-                    <div class="mt-3">
-                        <a href="{{ incident.photo.url }}" target="_blank" class="btn btn-sm btn-primary me-2">
-                            <i class="fas fa-external-link-alt"></i> Ouvrir
+                    
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{{ incident.photo.url }}" target="_blank" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Ouvrir
                         </a>
                         <a href="{{ incident.photo.url }}" download class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-download"></i> Télécharger
+                            <i class="fas fa-download me-1"></i>Télécharger
                         </a>
                     </div>
                 {% else %}
-                <div class="text-muted py-5">
+                <div class="empty-media">
                     <i class="fas fa-camera fa-3x mb-3"></i>
                     <p>Aucun média disponible</p>
                 </div>
@@ -157,63 +216,30 @@ Incident #{{ incident.id }} - {{ incident.title }}
         <!-- Médias additionnels -->
         {% if incident.additional_media.all %}
         <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Médias additionnels ({{ incident.additional_media.all|length }})</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="row g-0">
+            <div class="card-body">
+                <h5 class="card-title border-bottom pb-3 mb-3">
+                    <i class="fas fa-images me-2"></i>Médias additionnels ({{ incident.additional_media.all|length }})
+                </h5>
+                
+                <div class="row g-2">
                     {% for media in incident.additional_media.all %}
-                    <div class="col-6 col-sm-4 p-1">
-                        <div class="media-thumbnail position-relative">
-                            {% if media.is_image %}
-                            <a href="{{ media.media_file.url }}" class="d-block" data-bs-toggle="modal" data-bs-target="#mediaModal{{ media.id }}">
-                                <img src="{{ media.media_file.url }}" alt="{{ media.caption|default:'Media' }}" class="img-fluid rounded" style="height: 120px; width: 100%; object-fit: cover;">
-                            </a>
-                            {% else %}
-                            <a href="{{ media.media_file.url }}" class="d-block position-relative" data-bs-toggle="modal" data-bs-target="#mediaModal{{ media.id }}">
-                                <div class="ratio ratio-1x1" style="height: 120px; background-color: #000;">
-                                    <div class="d-flex align-items-center justify-content-center">
-                                        <i class="fas fa-play-circle text-white fa-3x"></i>
+                    <div class="col-6">
+                        <a href="{{ media.file.url }}" target="_blank" class="media-item">
+                            {% with ext=media.file.url|lower %}
+                                {% if '.mp4' in ext or '.mov' in ext or '.avi' in ext or '.webm' in ext %}
+                                    <div class="media-thumbnail video">
+                                        <i class="fas fa-play-circle"></i>
                                     </div>
-                                </div>
-                            </a>
-                            {% endif %}
-                            <div class="media-type position-absolute top-0 end-0 m-1">
-                                <span class="badge {% if media.is_image %}bg-info{% else %}bg-danger{% endif %} rounded-pill">
-                                    <i class="fas {% if media.is_image %}fa-image{% else %}fa-video{% endif %}"></i>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Modal pour chaque média -->
-                    <div class="modal fade" id="mediaModal{{ media.id }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-xl modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">{{ media.caption|default:'Media' }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-                                </div>
-                                <div class="modal-body p-0 text-center">
-                                    {% if media.is_image %}
-                                    <img src="{{ media.media_file.url }}" class="img-fluid" alt="{{ media.caption|default:'Media' }}">
-                                    {% else %}
-                                    <div class="ratio ratio-16x9">
-                                        <video controls class="rounded">
-                                            <source src="{{ media.media_file.url }}" type="video/mp4">
-                                            Votre navigateur ne supporte pas la lecture vidéo.
-                                        </video>
+                                {% else %}
+                                    <div class="media-thumbnail">
+                                        <img src="{{ media.file.url }}" alt="Média additionnel" class="img-fluid rounded">
+                                        <div class="media-overlay">
+                                            <i class="fas fa-search-plus"></i>
+                                        </div>
                                     </div>
-                                    {% endif %}
-                                </div>
-                                <div class="modal-footer">
-                                    <a href="{{ media.media_file.url }}" download class="btn btn-primary">
-                                        <i class="fas fa-download"></i> Télécharger
-                                    </a>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                </div>
-                            </div>
-                        </div>
+                                {% endif %}
+                            {% endwith %}
+                        </a>
                     </div>
                     {% endfor %}
                 </div>
@@ -221,61 +247,29 @@ Incident #{{ incident.id }} - {{ incident.title }}
         </div>
         {% endif %}
         
-        <!-- Enregistrement audio -->
+        <!-- Actions rapides -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Enregistrement audio</h5>
-            </div>
-            <div class="card-body text-center">
-                {% if incident.voice_note %}
-                <div class="audio-player p-3 bg-light rounded">
-                    <div class="mb-3">
-                        <i class="fas fa-volume-up fa-2x text-primary mb-2"></i>
-                        <p class="small text-muted mb-2">Cliquez sur play pour écouter l'enregistrement</p>
-                    </div>
-                    <audio controls class="w-100 mb-3">
-                        <source src="{{ incident.voice_note.url }}" type="audio/mpeg">
-                        <source src="{{ incident.voice_note.url }}" type="audio/wav">
-                        <source src="{{ incident.voice_note.url }}" type="audio/ogg">
-                        Votre navigateur ne supporte pas l'élément audio.
-                    </audio>
-                </div>
-                <div class="mt-3">
-                    <a href="{{ incident.voice_note.url }}" target="_blank" class="btn btn-sm btn-primary me-2">
-                        <i class="fas fa-play-circle"></i> Écouter dans un nouvel onglet
-                    </a>
-                    <a href="{{ incident.voice_note.url }}" download class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-download"></i> Télécharger
-                    </a>
-                </div>
-                {% else %}
-                <div class="text-muted py-5">
-                    <i class="fas fa-microphone-slash fa-3x mb-3"></i>
-                    <p>Aucun enregistrement audio disponible</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        
-        <!-- Actions supplémentaires -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Actions</h5>
-            </div>
             <div class="card-body">
+                <h5 class="card-title border-bottom pb-3 mb-3">
+                    <i class="fas fa-bolt me-2"></i>Actions rapides
+                </h5>
+                
                 <div class="list-group">
-                   
-                    <a href="{% url 'admin_incidents_list' %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-list me-2"></i> Retour à la liste
-                    </a>
                     {% if incident.status != 'resolved' %}
-                    <a href="{% url 'admin_incident_resolve' incident.id %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-check me-2"></i> Marquer comme résolu
+                    <a href="{% url 'admin_incident_update_status' incident.id %}?status=resolved" class="list-group-item list-group-item-action text-success">
+                        <i class="fas fa-check me-2"></i>Marquer comme résolu
                     </a>
                     {% endif %}
+                    
+                    {% if incident.status != 'in_progress' %}
+                    <a href="{% url 'admin_incident_update_status' incident.id %}?status=in_progress" class="list-group-item list-group-item-action text-info">
+                        <i class="fas fa-spinner me-2"></i>Marquer en cours
+                    </a>
+                    {% endif %}
+                    
                     <button type="button" class="list-group-item list-group-item-action text-danger" 
                             data-bs-toggle="modal" data-bs-target="#deleteModal">
-                        <i class="fas fa-trash me-2"></i> Supprimer
+                        <i class="fas fa-trash me-2"></i>Supprimer
                     </button>
                 </div>
             </div>
@@ -301,7 +295,7 @@ Incident #{{ incident.id }} - {{ incident.title }}
             <div class="modal-footer">
                 {% if incident.photo and incident.photo.name %}
                     <a href="{{ incident.photo.url }}" download class="btn btn-primary">
-                        <i class="fas fa-download"></i> Télécharger
+                        <i class="fas fa-download me-1"></i>Télécharger
                     </a>
                 {% endif %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
@@ -309,8 +303,6 @@ Incident #{{ incident.id }} - {{ incident.title }}
         </div>
     </div>
 </div>
-
-
 
 <!-- Modal de suppression -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
@@ -321,16 +313,137 @@ Incident #{{ incident.id }} - {{ incident.title }}
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>Êtes-vous sûr de vouloir supprimer l'incident <strong>{{ incident.title }}</strong> ?</p>
-                <p class="text-danger">Cette action est irréversible.</p>
+                <div class="text-center mb-4">
+                    <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                    <h5>Êtes-vous sûr de vouloir supprimer cet incident ?</h5>
+                    <p class="text-muted">{{ incident.title }}</p>
+                </div>
+                <div class="alert alert-danger">
+                    Cette action est irréversible et supprimera définitivement toutes les données associées à cet incident.
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <a href="{% url 'admin_incident_delete' incident.id %}" class="btn btn-danger">Supprimer</a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <a href="{% url 'admin_incident_delete' incident.id %}" class="btn btn-danger">
+                    <i class="fas fa-trash me-1"></i>Supprimer
+                </a>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    }
+    
+    .avatar-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: var(--light-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-color);
+        font-size: 1.5rem;
+    }
+    
+    .info-item {
+        background-color: var(--light-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        height: 100%;
+    }
+    
+    .info-label {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--gray-color);
+        margin-bottom: 0.25rem;
+    }
+    
+    .info-value {
+        font-weight: 500;
+        color: var(--dark-color);
+    }
+    
+    .media-thumbnail {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--light-color);
+    }
+    
+    .media-thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s;
+    }
+    
+    .media-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    
+    .media-thumbnail:hover img {
+        transform: scale(1.05);
+    }
+    
+    .media-thumbnail:hover .media-overlay {
+        opacity: 1;
+    }
+    
+    .media-thumbnail.video {
+        background-color: #000;
+        color: white;
+        font-size: 2rem;
+    }
+    
+    .empty-media {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 1rem;
+        color: var(--gray-color);
+        background-color: var(--light-color);
+        border-radius: 12px;
+    }
+    
+    .video-container {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .status-select {
+        background-color: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        border-radius: 20px;
+        padding: 0.25rem 0.75rem;
+    }
+    
+    .status-select option {
+        background-color: white;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -339,22 +452,42 @@ Incident #{{ incident.id }} - {{ incident.title }}
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        {% if incident.latitude and incident.longitude %}
-        // Initialisation de la carte OpenStreetMap avec Leaflet
-        const lat = {{ incident.latitude }};
-        const lng = {{ incident.longitude }};
+        // Animation des cartes
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('animate__animated', 'animate__fadeIn');
+            }, index * 100);
+        });
         
-        const map = L.map('incident-map').setView([lat, lng], 15);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
-        
-        const marker = L.marker([lat, lng]).addTo(map);
-        
-        marker.bindPopup("<strong>{{ incident.title }}</strong><br>{{ incident.description|truncatechars:100 }}").openPopup();
-        {% endif %}
+        // Initialisation de la carte si les coordonnées sont disponibles
+        initMap();
     });
+    
+    function initMap() {
+        {% if incident.latitude and incident.longitude %}
+        try {
+            const lat = parseFloat("{{ incident.latitude }}");
+            const lng = parseFloat("{{ incident.longitude }}");
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const map = L.map('incident-map').setView([lat, lng], 15);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 19
+                }).addTo(map);
+                
+                const marker = L.marker([lat, lng]).addTo(map);
+                
+                const title = "{{ incident.title|escapejs }}";
+                const description = "{{ incident.description|truncatechars:100|escapejs }}";
+                marker.bindPopup("<strong>" + title + "</strong><br>" + description).openPopup();
+            }
+        } catch (error) {
+            console.error("Erreur lors de l'initialisation de la carte:", error);
+        }
+        {% endif %}
+    }
 </script>
 {% endblock %}
