@@ -1,59 +1,154 @@
-{% extends "admin/base.html" %}
+{% extends "registration/base_login.html" %}
 
 {% block title %}Connexion - Administration des incidents{% endblock %}
 
-{% block page_title %}
-Connexion
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #6200ea 0%, #9c27b0 100%);
+    }
+    
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .login-card {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        background: white;
+        width: 400px;
+        max-width: 90%;
+    }
+    
+    .login-header {
+        background: linear-gradient(135deg, #6200ea 0%, #9c27b0 100%);
+        padding: 25px;
+        text-align: center;
+        color: white;
+    }
+    
+    .login-logo {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+    }
+    
+    .login-body {
+        padding: 30px;
+    }
+    
+    .form-control {
+        border-radius: 50px;
+        padding: 12px 20px;
+        height: auto;
+        background-color: #f8f9fa;
+        border: none;
+        margin-bottom: 20px;
+        transition: all 0.3s;
+    }
+    
+    .form-control:focus {
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(98, 0, 234, 0.2);
+        border: none;
+    }
+    
+    .btn-login {
+        border-radius: 50px;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #6200ea 0%, #9c27b0 100%);
+        border: none;
+        width: 100%;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s;
+    }
+    
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(98, 0, 234, 0.4);
+    }
+    
+    .forgot-password {
+        color: #6200ea;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    
+    .forgot-password:hover {
+        color: #9c27b0;
+        text-decoration: underline;
+    }
+    
+    .alert {
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-xl-5 col-lg-6 col-md-8">
-        <div class="card shadow mb-4">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">Connexion à l'administration</h6>
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-logo">
+                <i class="fas fa-shield-alt"></i>
             </div>
-            <div class="card-body">
-                {% if form.errors %}
-                <div class="alert alert-danger">
-                    <p>Votre nom d'utilisateur et votre mot de passe ne correspondent pas. Veuillez réessayer.</p>
+            <h3>SecureAlert</h3>
+            <p class="mb-0">Système de gestion des incidents</p>
+        </div>
+        <div class="login-body">
+            {% if form.errors %}
+            <div class="alert alert-danger">
+                <p class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>Identifiants incorrects. Veuillez réessayer.</p>
+            </div>
+            {% endif %}
+            
+            {% if next %}
+                {% if user.is_authenticated %}
+                <div class="alert alert-warning">
+                    <p class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Accès refusé. Veuillez vous connecter avec un compte autorisé.</p>
                 </div>
                 {% endif %}
-                
-                {% if next %}
-                    {% if user.is_authenticated %}
-                    <div class="alert alert-warning">
-                        <p>Votre compte n'a pas accès à cette page. Pour continuer, veuillez vous connecter avec un compte disposant des autorisations nécessaires.</p>
+            {% endif %}
+            
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-0">
+                            <i class="fas fa-user text-primary"></i>
+                        </span>
+                        <input type="text" name="username" id="id_username" class="form-control" placeholder="Nom d'utilisateur" autofocus required>
                     </div>
-                    {% endif %}
-                {% endif %}
-                
-                <form method="post" action="{% url 'login' %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="id_username" class="form-label">Nom d'utilisateur</label>
-                        <input type="text" name="username" id="id_username" class="form-control" autofocus required>
+                </div>
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-0">
+                            <i class="fas fa-lock text-primary"></i>
+                        </span>
+                        <input type="password" name="password" id="id_password" class="form-control" placeholder="Mot de passe" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_password" class="form-label">Mot de passe</label>
-                        <input type="password" name="password" id="id_password" class="form-control" required>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="form-check">
+                        <input type="checkbox" name="remember" id="id_remember" class="form-check-input">
+                        <label for="id_remember" class="form-check-label">Se souvenir de moi</label>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="form-check">
-                            <input type="checkbox" name="remember" id="id_remember" class="form-check-input">
-                            <label for="id_remember" class="form-check-label">Se souvenir de moi</label>
-                        </div>
-                        <a href="{% url 'password_reset' %}">Mot de passe oublié ?</a>
-                    </div>
-                    <input type="hidden" name="next" value="{{ next }}">
-                    <div class="text-center">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-sign-in-alt me-2"></i> Se connecter
-                        </button>
-                    </div>
-                </form>
-            </div>
+                    <a href="{% url 'password_reset' %}" class="forgot-password">Mot de passe oublié?</a>
+                </div>
+                <input type="hidden" name="next" value="{{ next }}">
+                <button type="submit" class="btn btn-primary btn-login">
+                    <i class="fas fa-sign-in-alt me-2"></i>Connexion
+                </button>
+            </form>
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock %}
