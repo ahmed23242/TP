@@ -19,96 +19,6 @@ Tableau de bord
 
 {% block content %}
 <div class="row">
-    <!-- Statistiques générales -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-primary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                            Total des incidents</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_incidents }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Incidents récents (7 jours) -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-success shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                            Incidents sur 7 jours</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ recent_incidents }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-calendar fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Total des utilisateurs -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-info shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                            Total des utilisateurs</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_users }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-users fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Utilisateurs actifs -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                            Utilisateurs actifs</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_users }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-user-check fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Statistiques par statut -->
-    <div class="col-xl-6 col-md-6 mb-4">
-        <div class="card shadow h-100">
-            <div class="card-header py-3">
-                <h6 class="m-0 font-weight-bold text-primary">
-                    <i class="fas fa-chart-pie me-2"></i>Incidents par statut
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="chart-container" style="height: 250px;">
-                    <canvas id="statusChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Statistiques par type d'incident -->
     <div class="col-xl-6 col-md-6 mb-4">
         <div class="card shadow h-100">
@@ -120,6 +30,22 @@ Tableau de bord
             <div class="card-body">
                 <div class="chart-container" style="height: 250px;">
                     <canvas id="typeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques par statut -->
+    <div class="col-xl-6 col-md-6 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-pie me-2"></i>Incidents par statut
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="statusChart"></canvas>
                 </div>
             </div>
         </div>
