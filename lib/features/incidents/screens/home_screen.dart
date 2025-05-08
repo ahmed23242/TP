@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Theme.of(context).colorScheme.primary,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                'Urban Safety',
+                'SecureAlert',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.bold,
@@ -133,24 +133,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             actions: [
-              IconButton(
-                icon: Obx(() => Icon(
-                  _connectivityService.isConnected.value
-                    ? Icons.wifi
-                    : Icons.wifi_off,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                )),
-                onPressed: null,
-                tooltip: 'Statut de connexion',
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.sync,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
-                tooltip: 'Synchroniser',
-                onPressed: _syncManually,
-              ),
               Stack(
                 alignment: Alignment.center,
                 children: [
