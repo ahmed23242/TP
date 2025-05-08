@@ -14,7 +14,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '172.20.10.18', '10.0.2.2', '192.168.100.9', 'votre-nom-utilisateur.pythonanywhere.com', 'ahmedabddayme.pythonanywhere.com']
+ALLOWED_HOSTS = ['127.0.0.1', '192.168.223.153', '192.168.179.153', '10.0.2.2', '10.10.250.242']
 
 # Application definition
 INSTALLED_APPS = [
@@ -151,13 +151,13 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
 }
-
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Autoriser tous les origines seulement en développement
 if not DEBUG:
     CORS_ALLOWED_ORIGINS = [
-        "https://votre-nom-utilisateur.pythonanywhere.com",
-        "https://ahmedabddayme.pythonanywhere.com",
+       
         # Ajoutez ici d'autres domaines autorisés
     ]
 CORS_ALLOW_CREDENTIALS = True
@@ -189,3 +189,13 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+CORS_ALLOW_ALL_ORIGINS = True  # Pour le développement uniquement
+# INSTALLED_APPS = [
+#     ...
+#     'corsheaders',
+#     ...
+# ]
+# MIDDLEWARE = [
+#     'corsheaders.middleware.CorsMiddleware',
+#     ...
+# ]

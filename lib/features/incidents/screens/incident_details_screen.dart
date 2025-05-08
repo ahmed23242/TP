@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/incident.dart';
 import '../../auth/controllers/auth_controller.dart';
 import "package:timeago/timeago.dart" as timeago;
+import '../../../core/widgets/common_widgets.dart';
 
 class IncidentDetailsScreen extends StatefulWidget {
   const IncidentDetailsScreen({super.key});
@@ -15,24 +16,27 @@ class IncidentDetailsScreen extends StatefulWidget {
   State<IncidentDetailsScreen> createState() => _IncidentDetailsScreenState();
 }
 
-class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
+class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> with SingleTickerProviderStateMixin {
   late final Incident incident;
   late final AuthController authController;
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
+  late TabController _tabController;
   
   @override
   void initState() {
     super.initState();
     incident = Get.arguments;
     authController = Get.find<AuthController>();
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -53,25 +57,20 @@ class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
       });
     } else {
       try {
-        // Check if we need to load a new audio file
         if (_audioPlayer.audioSource == null || 
             (_audioPlayer.audioSource as AudioSource).toString() != path) {
           await _audioPlayer.setFilePath(path);
           
-          // Listen to player state changes
           _audioPlayer.playerStateStream.listen((state) {
             if (state.processingState == ProcessingState.completed) {
               setState(() {
                 _isPlaying = false;
-                // Réinitialiser la position mais s'assurer qu'elle ne dépasse pas la durée
                 _position = Duration.zero;
               });
-              // Réinitialiser le lecteur pour éviter les problèmes lors de la prochaine lecture
               _audioPlayer.stop();
             }
           });
           
-          // Listen to duration changes
           _audioPlayer.durationStream.listen((newDuration) {
             if (newDuration != null) {
               setState(() {
@@ -80,10 +79,8 @@ class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
             }
           });
           
-          // Listen to position changes
           _audioPlayer.positionStream.listen((newPosition) {
             setState(() {
-              // S'assurer que la position ne dépasse jamais la durée totale
               if (newPosition <= _duration) {
                 _position = newPosition;
               } else {
@@ -109,323 +106,456 @@ class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Incident Details'),
-        actions: [
-          if (authController.isAdmin)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                // TODO: Implement admin actions
-                switch (value) {
-                  case 'update_status':
-                    _showUpdateStatusDialog(context);
-                    break;
-                  case 'assign':
-                    _showAssignDialog(context);
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'update_status',
-                  child: Text('Update Status'),
-                ),
-                const PopupMenuItem(
-                  value: 'assign',
-                  child: Text('Assign Responder'),
-                ),
-              ],
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Afficher l'image depuis l'URL du serveur ou le chemin local
-            if (incident.photoUrl != null && incident.photoUrl!.isNotEmpty)
-              Image.network(
-                incident.photoUrl!,
-                height: 250,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  // Si l'image du serveur ne peut pas être chargée, essayer le fichier local
-                  if (incident.photoPath != null && incident.photoPath!.isNotEmpty) {
-                    return Image.file(
-                      File(incident.photoPath!),
-                      height: 250,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 250,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.error),
-                      ),
-                    );
-                  }
-                  return Container(
-                    height: 250,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.error),
-                  );
-                },
-              )
-            else if (incident.photoPath != null && incident.photoPath!.isNotEmpty)
-              // Si pas d'URL serveur, utiliser le fichier local
-              Image.file(
-                File(incident.photoPath!),
-                height: 250,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 250,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.error),
-                  );
-                },
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: CustomScrollView(
+        slivers: [
+          // App Bar avec image de fond
+          SliverAppBar(
+            expandedHeight: 300,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Row(
+                  // Image de l'incident
+                  if (incident.photoUrl != null && incident.photoUrl!.isNotEmpty)
+                    Image.network(
+                      incident.photoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        if (incident.photoPath != null && incident.photoPath!.isNotEmpty) {
+                          return Image.file(
+                            File(incident.photoPath!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                          );
+                        }
+                        return _buildPlaceholderImage();
+                      },
+                    )
+                  else if (incident.photoPath != null && incident.photoPath!.isNotEmpty)
+                    Image.file(
+                      File(incident.photoPath!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
+                    )
+                  else
+                    _buildPlaceholderImage(),
+                  // Dégradé pour améliorer la lisibilité
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.7),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new),
+              onPressed: () => Get.back(),
+            ),
+            actions: [
+              if (authController.isAdmin)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'update_status':
+                        _showUpdateStatusDialog(context);
+                        break;
+                      case 'assign':
+                        _showAssignDialog(context);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'update_status',
+                      child: Text('Mettre à jour le statut'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'assign',
+                      child: Text('Assigner un intervenant'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          
+          // Contenu principal
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // En-tête avec titre et statut
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(incident.syncStatus),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          incident.syncStatus.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(incident.status).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getStatusColor(incident.status),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getStatusIcon(incident.status),
+                                  color: _getStatusColor(incident.status),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  incident.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: _getStatusColor(incident.status),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getSyncStatusColor(incident.syncStatus).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getSyncStatusColor(incident.syncStatus),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getSyncStatusIcon(incident.syncStatus),
+                                  color: _getSyncStatusColor(incident.syncStatus),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  incident.syncStatus.toUpperCase(),
+                                  style: TextStyle(
+                                    color: _getSyncStatusColor(incident.syncStatus),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    incident.title,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    incident.description,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time),
-                      const SizedBox(width: 8),
+                      const SizedBox(height: 16),
                       Text(
-                        'Reported ${timeago.format(incident.createdAt)}',
-                        style: const TextStyle(color: Colors.grey),
+                        incident.title,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Signalé ${timeago.format(incident.createdAt)}',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Location',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 200,
-                    child: FlutterMap(
-                      options: MapOptions(
-                        initialCenter: LatLng(incident.latitude, incident.longitude),
-                        initialZoom: 15.0,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          subdomains: ['a', 'b', 'c'],
-                          userAgentPackageName: 'com.accidentsapp',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              width: 40.0,
-                              height: 40.0,
-                              point: LatLng(incident.latitude, incident.longitude),
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 40,
+                ),
+
+                // Onglets
+                TabBar(
+                  controller: _tabController,
+                  labelColor: Theme.of(context).colorScheme.primary,
+                  unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  indicatorColor: Theme.of(context).colorScheme.primary,
+                  tabs: const [
+                    Tab(text: 'Détails'),
+                    Tab(text: 'Localisation'),
+                    Tab(text: 'Médias'),
+                  ],
+                ),
+
+                // Contenu des onglets
+                SizedBox(
+                  height: 400,
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Onglet Détails
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CustomCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Description',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    incident.description,
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            CustomCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Type d\'incident',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      incident.incidentType,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  // Afficher le lecteur audio si un fichier audio est disponible
-                  if (incident.voiceNotePath != null) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Voice Note',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Lecteur audio pour les notes vocales
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+
+                      // Onglet Localisation
+                      Stack(
                         children: [
-                          Row(
+                          FlutterMap(
+                            options: MapOptions(
+                              initialCenter: LatLng(incident.latitude, incident.longitude),
+                              initialZoom: 15,
+                            ),
                             children: [
-                              // Bouton play/pause
-                              IconButton(
-                                onPressed: () {
-                                  if (incident.voiceNotePath != null) {
-                                    _playPause(incident.voiceNotePath!);
-                                  }
-                                },
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.blue,
-                                  size: 36,
-                                ),
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.example.app',
                               ),
-                              const SizedBox(width: 8),
-                              // Barre de progression
-                              Expanded(
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(incident.latitude, incident.longitude),
+                                    width: 80,
+                                    height: 80,
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            incident.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.location_on,
+                                          color: Theme.of(context).colorScheme.primary,
+                                          size: 40,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Positioned(
+                            bottom: 16,
+                            left: 16,
+                            right: 16,
+                            child: CustomCard(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    SliderTheme(
-                                      data: SliderThemeData(
-                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                        trackHeight: 4,
-                                        thumbColor: Colors.blue,
-                                        activeTrackColor: Colors.blue,
-                                        inactiveTrackColor: Colors.grey[300],
-                                      ),
-                                      child: Slider(
-                                        value: _position.inMilliseconds.toDouble().clamp(0, _duration.inMilliseconds.toDouble()),
-                                        max: _duration.inMilliseconds.toDouble(),
-                                        onChanged: (value) {
-                                          final position = Duration(milliseconds: value.toInt());
-                                          _audioPlayer.seek(position);
-                                        },
+                                    Text(
+                                      'Coordonnées',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    // Affichage du temps
+                                    const SizedBox(height: 8),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(_formatDuration(_position)),
-                                        Text(_formatDuration(_duration)),
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 16,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${incident.latitude.toStringAsFixed(6)}, ${incident.longitude.toStringAsFixed(6)}',
+                                          style: Theme.of(context).textTheme.bodyMedium,
+                                        ),
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                  
-                  // Afficher les médias supplémentaires s'il y en a
-                  if (incident.additionalMedia.isNotEmpty) ...[  
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Additional Media',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 120,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: incident.additionalMedia.length,
-                        itemBuilder: (context, index) {
-                          final media = incident.additionalMedia[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: GestureDetector(
-                              onTap: () {
-                                // Afficher le média en plein écran
-                                // TODO: Implémenter l'affichage en plein écran
-                              },
-                              child: Container(
-                                width: 120,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+
+                      // Onglet Médias
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (incident.voiceNotePath != null && incident.voiceNotePath!.isNotEmpty)
+                              CustomCard(
                                 child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      media['media_type'] == 'image' 
-                                          ? Icons.image 
-                                          : media['media_type'] == 'video'
-                                              ? Icons.videocam
-                                              : Icons.insert_drive_file,
-                                      size: 40,
-                                      color: Colors.blue,
-                                    ),
-                                    const SizedBox(height: 8),
                                     Text(
-                                      media['caption'] ?? 'Media ${index + 1}',
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
+                                      'Enregistrement audio',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () => _playPause(incident.voiceNotePath!),
+                                          icon: Icon(
+                                            _isPlaying ? Icons.pause : Icons.play_arrow,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Slider(
+                                                value: _position.inSeconds.toDouble(),
+                                                min: 0,
+                                                max: _duration.inSeconds.toDouble(),
+                                                onChanged: (value) {
+                                                  _audioPlayer.seek(Duration(seconds: value.toInt()));
+                                                },
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      _formatDuration(_position),
+                                                      style: Theme.of(context).textTheme.bodySmall,
+                                                    ),
+                                                    Text(
+                                                      _formatDuration(_duration),
+                                                      style: Theme.of(context).textTheme.bodySmall,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  void _showUpdateStatusDialog(BuildContext context) {
-    // TODO: Implement status update dialog
-  }
-
-  void _showAssignDialog(BuildContext context) {
-    // TODO: Implement responder assignment dialog
+  Widget _buildPlaceholderImage() {
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          size: 64,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+        ),
+      ),
+    );
   }
 
   Color _getStatusColor(String status) {
@@ -439,5 +569,52 @@ class _IncidentDetailsScreenState extends State<IncidentDetailsScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.pending;
+      case 'in_progress':
+        return Icons.engineering;
+      case 'resolved':
+        return Icons.check_circle;
+      default:
+        return Icons.help;
+    }
+  }
+
+  Color _getSyncStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'synced':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getSyncStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'synced':
+        return Icons.sync;
+      case 'pending':
+        return Icons.sync;
+      case 'failed':
+        return Icons.sync_problem;
+      default:
+        return Icons.sync_disabled;
+    }
+  }
+
+  void _showUpdateStatusDialog(BuildContext context) {
+    // TODO: Implement status update dialog
+  }
+
+  void _showAssignDialog(BuildContext context) {
+    // TODO: Implement responder assignment dialog
   }
 }

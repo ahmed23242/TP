@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/services/auth_service.dart';
 import 'features/incidents/services/incident_service.dart';
 import 'features/incidents/controllers/incident_controller.dart';
@@ -89,68 +90,69 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Urban Incidents',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      title: 'Urban Safety',
+      theme: AppTheme.getLightTheme(),
+      darkTheme: AppTheme.getDarkTheme(),
       themeMode: ThemeMode.system,
       initialBinding: BindingsBuilder(() {
-        // Note: les services principaux sont déjà enregistrés dans main()
         Get.lazyPut(() => IncidentController());
       }),
       initialRoute: '/login',
       getPages: [
-        GetPage(name: '/login', page: () => LoginScreen()),
-        GetPage(name: '/register', page: () => RegisterScreen()),
         GetPage(
-          name: '/home', 
+          name: '/login',
+          page: () => LoginScreen(),
+          transition: Transition.fadeIn,
+        ),
+        GetPage(
+          name: '/register',
+          page: () => RegisterScreen(),
+          transition: Transition.fadeIn,
+        ),
+        GetPage(
+          name: '/home',
           page: () => const HomeScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
         ),
         GetPage(
-          name: '/map', 
+          name: '/map',
           page: () => const MapScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
         ),
         GetPage(
-          name: '/incident/create', 
+          name: '/incident/create',
           page: () => const CreateIncidentScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
         ),
         GetPage(
-          name: '/incident/details', 
+          name: '/incident/details',
           page: () => IncidentDetailsScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
         ),
         GetPage(
-          name: '/incident/history', 
+          name: '/incident/history',
           page: () => const IncidentHistoryScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
         ),
         GetPage(
-          name: '/incident/pending', 
+          name: '/incident/pending',
           page: () => const PendingIncidentsScreen(),
+          transition: Transition.rightToLeft,
           binding: BindingsBuilder(() {
             Get.put(IncidentController());
           }),
