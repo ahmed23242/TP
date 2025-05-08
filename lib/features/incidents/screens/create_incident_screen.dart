@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -175,8 +176,8 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
       if (cameraStatus != PermissionStatus.granted || 
           microphoneStatus != PermissionStatus.granted) {
         Get.snackbar(
-          'Error',
-          'Camera and microphone permissions are required to record video',
+          'Erreur',
+          'Les permissions de la caméra et du microphone sont requises',
           snackPosition: SnackPosition.BOTTOM,
         );
         return;
@@ -184,7 +185,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
 
       final pickedFile = await _imagePicker.pickVideo(
         source: ImageSource.camera,
-        maxDuration: const Duration(seconds: 60),
+        maxDuration: const Duration(seconds: 30),
       );
       
       if (pickedFile != null) {
@@ -192,15 +193,19 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
           _additionalMedia.add({
             'type': 'video',
             'path': pickedFile.path,
-            'caption': 'Video ${_additionalMedia.length + 1}'
+            'caption': 'Vidéo ${_additionalMedia.length + 1}'
           });
-          
-          // Initialize video player for preview
-          _initializeVideoPlayer(pickedFile.path);
         });
+        
+        // Initialize video player for preview
+        await _initializeVideoPlayer(pickedFile.path);
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to record video: $e');
+      Get.snackbar(
+        'Erreur',
+        'Impossible d\'enregistrer la vidéo: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
   
@@ -209,8 +214,8 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
       final status = await Permission.photos.request();
       if (status != PermissionStatus.granted) {
         Get.snackbar(
-          'Error',
-          'Gallery permission denied',
+          'Erreur',
+          'Permission de la galerie refusée',
           snackPosition: SnackPosition.BOTTOM,
         );
         return;
@@ -218,7 +223,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
 
       final pickedFile = await _imagePicker.pickVideo(
         source: ImageSource.gallery,
-        maxDuration: const Duration(minutes: 2),
+        maxDuration: const Duration(minutes: 1),
       );
       
       if (pickedFile != null) {
@@ -226,28 +231,53 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
           _additionalMedia.add({
             'type': 'video',
             'path': pickedFile.path,
-            'caption': 'Video ${_additionalMedia.length + 1}'
+            'caption': 'Vidéo ${_additionalMedia.length + 1}'
           });
-          
-          // Initialize video player for preview
-          _initializeVideoPlayer(pickedFile.path);
         });
+        
+        // Initialize video player for preview
+        await _initializeVideoPlayer(pickedFile.path);
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to pick video: $e');
+      Get.snackbar(
+        'Erreur',
+        'Impossible de sélectionner la vidéo: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
   
   Future<void> _initializeVideoPlayer(String videoPath) async {
-    // Dispose previous controller if exists
-    await _videoPlayerController?.dispose();
-    
-    // Create new controller
-    _videoPlayerController = VideoPlayerController.file(File(videoPath));
-    
-    // Initialize and update UI when ready
-    await _videoPlayerController!.initialize();
-    setState(() {});
+    try {
+      // Dispose previous controller if exists
+      await _videoPlayerController?.dispose();
+      
+      // Create new controller with error handling
+      _videoPlayerController = VideoPlayerController.file(File(videoPath));
+      
+      // Initialize with timeout
+      await _videoPlayerController!.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Video initialization timed out');
+        },
+      );
+      
+      // Set volume to 0 by default
+      await _videoPlayerController!.setVolume(0.0);
+      
+      setState(() {});
+    } catch (e) {
+      Get.snackbar(
+        'Erreur',
+        'Impossible de charger la vidéo. Format non supporté ou fichier corrompu.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+      // Clean up on error
+      await _videoPlayerController?.dispose();
+      _videoPlayerController = null;
+    }
   }
   
   void _toggleVideoPlayback() {
@@ -777,14 +807,18 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Médias additionnels',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      'Médias additionnels',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Wrap(
-                    spacing: 8,
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         onPressed: _pickImage,
@@ -794,6 +828,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
                           minWidth: 40,
                           minHeight: 40,
                         ),
+                        padding: const EdgeInsets.all(8),
                       ),
                       IconButton(
                         onPressed: _recordVideo,
@@ -803,6 +838,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
                           minWidth: 40,
                           minHeight: 40,
                         ),
+                        padding: const EdgeInsets.all(8),
                       ),
                       IconButton(
                         onPressed: _pickVideo,
@@ -812,6 +848,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
                           minWidth: 40,
                           minHeight: 40,
                         ),
+                        padding: const EdgeInsets.all(8),
                       ),
                     ],
                   ),
@@ -881,6 +918,67 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> with Single
                   ),
                 ),
               ],
+              const SizedBox(height: 16),
+              // Audio recording section
+              Text(
+                'Note vocale',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_voiceNotePath != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.mic,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Note vocale enregistrée',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Appuyez pour écouter',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _voiceNotePath = null;
+                          });
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                AudioRecorderWidget(
+                  onRecordingComplete: _onRecordingComplete,
+                ),
             ],
           ),
         ),
